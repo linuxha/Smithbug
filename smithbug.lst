@@ -1,0 +1,2874 @@
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 1 - 3/9/2024 102250
+
+
+       1/       0 :                             include "smithbug.inc"
+(1)    1/       0 :                     ; ===========================================================================
+(1)    2/       0 :                             cpu 6800
+(1)    3/       0 :                             ;;
+(1)    4/       0 :                             include "motorola.inc"          ; Macros for things like fcc,db, etc.
+(2)    1/       0 :                     ;
+(2)    2/       0 :                     ; Motorola 68xx/Hitachi 63xx
+(2)    3/       0 :                     ; ADR	BYT	DC[.<size>]	DFS	DS[.<size>]
+(2)    4/       0 :                     ; FCB	FCC	FDB		PADDING	RMB
+(2)    5/       0 :                     ;
+(2)    6/       0 :                     list            macro
+(2)    7/       0 :                                       listing on
+(2)    8/       0 :                                     endm
+(2)    9/       0 :                     
+(2)   10/       0 :                     nolist          macro
+(2)   11/       0 :                                       listing off
+(2)   12/       0 :                                     endm
+(2)   13/       0 :                     
+(2)   14/       0 :                     db              macro   op
+(2)   15/       0 :                                       ;byt   (op)+1
+(2)   16/       0 :                                       byt   ALLARGS
+(2)   17/       0 :                                     endm
+(2)   18/       0 :                     
+(2)   19/       0 :                     Xfcb             macro   args
+(2)   20/       0 :                                       byt   ALLARGS
+(2)   21/       0 :                                     endm
+(2)   22/       0 :                     
+(2)   23/       0 :                     ; Modified to allow
+(2)   24/       0 :                     ; label fcc "string"
+(2)   25/       0 :                     ; or
+(2)   26/       0 :                     ; label fcc "string", $04, ...
+(2)   27/       0 :                     Xfcc             macro   args
+(2)   28/       0 :                                       byt   ALLARGS
+(2)   29/       0 :                                     endm
+(2)   30/       0 :                     
+(2)   31/       0 :                     dw              macro   op
+(2)   32/       0 :                                       adr   (op)
+(2)   33/       0 :                                     endm
+(2)   34/       0 :                     
+(2)   35/       0 :                     Xfdb             macro   op
+(2)   36/       0 :                                       adr   (op)
+(2)   37/       0 :                                     endm
+(2)   38/       0 :                     
+(2)   39/       0 :                     fcw             macro   op
+(2)   40/       0 :                                       adr   (op)
+(2)   41/       0 :                                     endm
+(2)   42/       0 :                     
+(2)   43/       0 :                     ds              macro   op
+(2)   44/       0 :                                       dfs   (op)
+(2)   45/       0 :                                     endm
+(2)   46/       0 :                     
+(2)   47/       0 :                     Xrmb            macro	op
+(2)   48/       0 :                                     ds.b    (op)
+(2)   49/       0 :                                     endm
+(2)   50/       0 :                     
+(2)   51/       0 :                     Zrmb             macro	op
+(2)   52/       0 :                                       rept  op
+(2)   53/       0 :                                         db  0
+(2)   54/       0 :                                       endm
+(2)   55/       0 :                                     endm
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm(motorola.inc) - page 2 - 3/9/2024 102250
+
+
+(2)   56/       0 :                     
+(2)   57/       0 :                     dd              macro   op
+(2)   58/       0 :                                       adr   (op)>>16,(op)&$ffff
+(2)   59/       0 :                                     endm
+(2)   60/       0 :                     
+(2)   61/       0 :                     fcd             macro   op
+(2)   62/       0 :                                       adr   (op)>>16,(op)&$ffff
+(2)   63/       0 :                                     endm
+(2)   64/       0 :                     
+(2)   65/       0 :                     page            macro
+(2)   66/       0 :                                       newpage
+(2)   67/       0 :                                     endm
+(2)   68/       0 :                     
+(2)   69/       0 :                     opt             macro
+(2)   70/       0 :                                     endm
+(2)   71/       0 :                     
+(2)   72/       0 :                     noopt           macro
+(2)   73/       0 :                                     endm
+(2)   74/       0 :                     
+(2)   75/       0 :                     
+(1)    5/       0 :                             include "MC6800.inc"
+(2)    1/       0 :                     ;* Currently working on this
+(2)    2/       0 :                     ;* Need a way to transfer X to B:A
+(2)    3/       0 :                     ;* then pshd
+(2)    4/       0 :                     	;; stx     $40,sp	; I could ins
+(2)    5/       0 :                             ;; stx     $4050,sp
+(2)    6/       0 :                             ;; ins
+(2)    7/       0 :                             ;; des
+(2)    8/       0 :                             ;;
+(2)    9/       0 :                             ;; Xhi:Xlo
+(2)   10/       0 :                             ;;   A:B
+(2)   11/       0 :                             ;;    D 
+(2)   12/       0 :                             ;; 15   0
+(2)   13/       0 :                             ;; 
+(2)   14/       0 :                             ;; ldx	#1234
+(2)   15/       0 :                             ;; stx	#$8000
+(2)   16/       0 :                     	;; addr 80 = HiByte $12 ; Xhi (A)
+(2)   17/       0 :                             ;; addr 81 = LoByte $34 ; xLo (B)
+(2)   18/       0 :                     pshx    macro
+(2)   19/       0 :                             stx     tmpX            ; save X to tmp
+(2)   20/       0 :                             ldaa    tmpX            ; Xhi
+(2)   21/       0 :                             ldab    tmpX+1          ; Xlo
+(2)   22/       0 :                             pshd
+(2)   23/       0 :                             endm
+(2)   24/       0 :                     
+(2)   25/       0 :                     ;* Currently working on this
+(2)   26/       0 :                     ;* Need a way to transfer B:A to X
+(2)   27/       0 :                     ;* then puld
+(2)   28/       0 :                     pulx    macro
+(2)   29/       0 :                             puld
+(2)   30/       0 :                             staa    tmpX            ; Xhi
+(2)   31/       0 :                             stab    tmpX+1          ; Xlo
+(2)   32/       0 :                             endm
+(2)   33/       0 :                     
+(2)   34/       0 :                     puld    macro
+(2)   35/       0 :                             pula                    ; Xhi
+(2)   36/       0 :                             pulb                    ; Xlo
+(2)   37/       0 :                             endm
+(2)   38/       0 :                     
+(2)   39/       0 :                     pshd    macro
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm(MC6800.inc) - page 3 - 3/9/2024 102250
+
+
+(2)   40/       0 :                             pshb                    ; Xlo
+(2)   41/       0 :                             psha                    ; Xhi
+(2)   42/       0 :                             endm
+(2)   43/       0 :                     
+(2)   44/       0 :                     ldd     macro   addr
+(2)   45/       0 :                             nop
+(2)   46/       0 :                             ldaa    addr            ; Xhi
+(2)   47/       0 :                             ldab    addr+1          ; Xlo
+(2)   48/       0 :                             endm
+(2)   49/       0 :                     
+(2)   50/       0 :                     std     macro   addr
+(2)   51/       0 :                             staa    addr            ; Xhi
+(2)   52/       0 :                             stab    addr+1          ; Xlo
+(2)   53/       0 :                             endm
+(2)   54/       0 :                     
+(2)   55/       0 :                     ;* X <- B + X
+(2)   56/       0 :                     abx     macro
+(2)   57/       0 :                             nop
+(2)   58/       0 :                             endm
+(2)   59/       0 :                     
+(2)   60/       0 :                     ;* D <- D + M:M+1
+(2)   61/       0 :                     ;addd    macro op
+(2)   62/       0 :                     ;        nop
+(2)   63/       0 :                     ;        warning "addd - Need to create the 6801 macros for saving X and D acc" ;
+(2)   64/       0 :                     ;        endm
+(2)   65/       0 :                     
+(2)   66/       0 :                     ;* D <- D - M:M+1
+(2)   67/       0 :                     subd    macro
+(2)   68/       0 :                             nop
+(2)   69/       0 :                             endm
+(2)   70/       0 :                     
+(2)   71/       0 :                     ;      error   "Need to create the 6801 macros for saving X and D acc" ;
+(2)   72/       0 :                     ;      warning "Need to create the 6801 macros for saving X and D acc" ;
+(2)   73/       0 :                     ;/* Local Variables: */
+(2)   74/       0 :                     ;/* mode:asm         */
+(2)   75/       0 :                     ;/* End:             */
+(2)   76/       0 :                     
+(2)   77/       0 :                     
+(1)    6/       0 :                     ; ===========================================================================
+(1)    7/       0 : =>DEFINED               IFDEF _E000
+(1)    8/       0 : =$DF00              UPRAM   EQU     $DF00           ; TOP OF USER MEMORY
+(1)    9/       0 : =>FALSE                 ELSE
+(1)   10/       0 :                     UPRAM   EQU     $7F00           ; TOP OF USER MEMORY
+(1)   11/       0 : [7]                     ENDIF
+(1)   12/       0 :                     ;
+(1)   13/    DF00 :                             ORG     UPRAM           ; V1 has ORG at $A000H
+(1)   14/    DF00 :                     ;
+(1)   15/    DF00 : =$DF00              MSTART  EQU     *
+(1)   16/    DF00 :                     ;
+(1)   17/    DF00 :                     BUFFER  RMB 2                   ; V2: Buffer to protect system scratch ???
+(1)   18/    DF02 :                     IOV     RMB 2                   ; Vector -here and below same as V1
+(1)   19/    DF04 :                     BEGA    RMB 2
+(1)   20/    DF06 :                     ENDA    RMB 2
+(1)   21/    DF08 :                     NIO     RMB 2                   ; Vector
+(1)   22/    DF0A :                     SP      RMB 2
+(1)   23/    DF0C :                     ACIAT   RMB 1
+(1)   24/    DF0D :                     ECHO    RMB 1
+(1)   25/    DF0E :                     XHI     RMB 1
+(1)   26/    DF0F :                     XLOW    RMB 1
+(1)   27/    DF10 :                     TEMP    RMB 1
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm(smithbug.inc) - page 4 - 3/9/2024 102250
+
+
+(1)   28/    DF11 :                     TW      RMB 2
+(1)   29/    DF13 :                     TFLAG   RMB 1
+(1)   30/    DF14 :                     XTEMP   RMB 2
+(1)   31/    DF16 :                     BKFLG   RMB 1
+(1)   32/    DF17 :                     SWIPTR  RMB 45                  ; Vector
+(1)   33/    DF44 :                     STACK   RMB 8
+(1)   34/    DF4C :                     PRINTR  RMB 3
+(1)   35/    DF4F :                     BFLAG   RMB 1
+(1)   36/    DF50 :                     MFLAG   RMB 1
+(1)   37/    DF51 :                     XFLAG   RMB 1
+(1)   38/    DF52 :                     BITE2   RMB 1
+(1)   39/    DF53 :                     BITE3   RMB 15
+(1)   40/    DF62 :                     TSTACK  RMB 2                   ; Fixed with 2?
+(1)   41/    DF64 :                     OPSAVE  RMB 1
+(1)   42/    DF65 :                     PB1     RMB 1
+(1)   43/    DF66 :                     PB2     RMB 1
+(1)   44/    DF67 :                     PB3     RMB 1
+(1)   45/    DF68 :                     BYTECT  RMB 1
+(1)   46/    DF69 :                     PC1     RMB 1
+(1)   47/    DF6A :                     PC2     RMB 1
+(1)   48/    DF6B :                     BPOINT  RMB 3
+(1)   49/    DF6E :                     BKFLG2  RMB 1
+(1)   50/    DF6F :                     MCONT   RMB 1
+(1)   51/    DF70 :                     ; V2 S-record data area
+(1)   52/    DF70 :                     TEMPX1  RMB 2                   ; S-Load Temporary X register
+(1)   53/    DF72 :                     ADDRESS RMB 1                   ; Build 16 bit address byte 1
+(1)   54/    DF73 :                     ;
+(1)   55/    DF73 :                     ADDRESS1        RMB 1           ; Build 16 bit address byte 2
+(1)   56/    DF74 :                     BYTESTORE       RMB 1           ; Save Byte Count
+(1)   57/    DF75 :                     TEMPA           RMB 1           ; Save A Register
+(1)   58/    DF76 :                     ;
+(1)   59/    DF76 :                     USERV   RMB 2                   ; User Vector
+(1)   60/    DF78 :                     ;;; 
+(1)   61/    DF78 : =$DF78              MFINI   EQU *
+(1)   62/    DF78 :                     
+(1)   63/    DF78 : =$78                RAMSIZE	EQU MFINI - MSTART
+(1)   64/    DF78 :                     ;;;
+(1)   65/    DF78 :                     ;;;
+(1)   66/    DF78 :                     ;;; 
+(1)   67/    DF78 : =>UNDEFINED             IFDEF _SIM
+(1)   68/    DF78 :                     ;;;
+(1)   69/    DF78 :                     ;;; Original (the way I got it)
+(1)   70/    DF78 :                     ;;; 
+(1)   71/    DF78 :                     ACIACS  EQU     $F000           ;V3 has $F000, $F001
+(1)   72/    DF78 :                     ACIADA  EQU     $F001
+(1)   73/    DF78 :                     ;
+(1)   74/    DF78 :                     ;PIAD1A  EQU     $F004           ;V2 has PIA support
+(1)   75/    DF78 :                     ;PIAS1A  EQU     $F005
+(1)   76/    DF78 :                     ;PIAD1B  EQU     $F006
+(1)   77/    DF78 :                     ;PIAS1B  EQU     $F007
+(1)   78/    DF78 :                     ;
+(1)   79/    DF78 :                     ;PIAD2A  EQU     $8008
+(1)   80/    DF78 :                     ;PIAS2A  EQU     $8009
+(1)   81/    DF78 :                     ;PIAD2B  EQU     $800A
+(1)   82/    DF78 :                     ;PIAS2B  EQU     $800B
+(1)   83/    DF78 :                     ;;;
+(1)   84/    DF78 :                     ;;; Original (the way I got it)
+(1)   85/    DF78 :                     ;;; 
+(1)   86/    DF78 :                     RSTART  EQU     $C000
+(1)   87/    DF78 : =>TRUE                  ELSE
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm(smithbug.inc) - page 5 - 3/9/2024 102250
+
+
+(1)   88/    DF78 :                     ;
+(1)   89/    DF78 : =>DEFINED               IFDEF _E000
+(1)   90/    DF78 :                     ;;;
+(1)   91/    DF78 :                     ;;; Adjusted for my MP-02
+(1)   92/    DF78 :                     ;;; 
+(1)   93/    DF78 : =$E000              ACIACS  EQU     $E000           ;V1 has $8000, $8001
+(1)   94/    DF78 : =$E001              ACIADA  EQU     $E001
+(1)   95/    DF78 :                     ;
+(1)   96/    DF78 : =$E004              PIAD1A  EQU     $E004           ;V2 has PIA support
+(1)   97/    DF78 : =$E005              PIAS1A  EQU     PIAD1A+1
+(1)   98/    DF78 : =$E006              PIAD1B  EQU     PIAD1A+2
+(1)   99/    DF78 : =$E007              PIAS1B  EQU     PIAD1A+3
+(1)  100/    DF78 :                     ;
+(1)  101/    DF78 : =$E008              PIAD2A  EQU     $E008
+(1)  102/    DF78 : =$E009              PIAS2A  EQU     PIAD2A+1
+(1)  103/    DF78 : =$E00A              PIAD2B  EQU     PIAD2A+2
+(1)  104/    DF78 : =$E00B              PIAS2B  EQU     PIAD2A+3
+(1)  105/    DF78 :                     ;;;
+(1)  106/    DF78 :                     ;;; Adjusted for my MP-02
+(1)  107/    DF78 :                     ;;; 
+(1)  108/    DF78 : =$E100              RSTART  EQU     $E100           ; IO at $E000, ROM starts at $E100
+(1)  109/    DF78 : =>FALSE                 ELSE
+(1)  110/    DF78 :                     ;;;
+(1)  111/    DF78 :                     ;;; Original (the way I got it)
+(1)  112/    DF78 :                     ;;; 
+(1)  113/    DF78 :                     ACIACS  EQU     $8018           ;V1 has $8000, $8001
+(1)  114/    DF78 :                     ACIADA  EQU     $8019
+(1)  115/    DF78 :                     ;
+(1)  116/    DF78 :                     PIAD1A  EQU     $8000           ;V2 has PIA support
+(1)  117/    DF78 :                     PIAS1A  EQU     $8001
+(1)  118/    DF78 :                     PIAD1B  EQU     $8002
+(1)  119/    DF78 :                     PIAS1B  EQU     $8003
+(1)  120/    DF78 :                     ;
+(1)  121/    DF78 :                     PIAD2A  EQU     $8008
+(1)  122/    DF78 :                     PIAS2A  EQU     $8009
+(1)  123/    DF78 :                     PIAD2B  EQU     $800A
+(1)  124/    DF78 :                     PIAS2B  EQU     $800B
+(1)  125/    DF78 :                     ;;;
+(1)  126/    DF78 :                     ;;; Original (the way I got it)
+(1)  127/    DF78 :                     ;;; 
+(1)  128/    DF78 :                     RSTART  EQU     $C000
+(1)  129/    DF78 :                     
+(1)  130/    DF78 : [89]                    ENDIF                       ; _E100 or default
+(1)  131/    DF78 : [67]                    ENDIF                       ; _SIM
+(1)  132/    DF78 :                     
+(1)  133/    DF78 :                     ; =[ Fini ]==================================================================
+(1)  134/    DF78 :                     ;/* Local Variables: */
+(1)  135/    DF78 :                     ;/* mode:asm         */
+(1)  136/    DF78 :                     ;/* End:             */
+(1)  137/    DF78 :                     
+       2/    DF78 :                     ;       title "MIKES-M6802 OPERATING SYSTEM"
+       3/    DF78 :                     ;       REV 2.0
+       4/    DF78 :                     ;
+       5/    DF78 :                     ; This is the latest SMITHBUG+S1 source 
+       6/    DF78 :                     ; with the Disassembler "PSH A = MISSING A" bug removed 
+       7/    DF78 :                     ; [see TBLKUP routine, # sign did not replace  £ ].
+       8/    DF78 :                     ; I emailed Ed Smith but as yet no reply. - Mike Lee, April 24 2019
+       9/    DF78 :                     ;
+      10/    DF78 :                     ; July 30 2019 HRJ 
+      11/    DF78 :                     ; - corrected TBLKUP routine as above, adds 4 bytes to code
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 6 - 3/9/2024 102250
+
+
+      12/    DF78 :                     ; -  CMPX       VAR non- instruction commented out near GETCNT in S-record routine
+      13/    DF78 :                     ; -  SLOAD routine starts NINE bytes from previous code, TBLKUP only accounts for four                       
+      14/    DF78 :                     ; -- difference of 5 occurs apparently in counting bytes in S1STRING
+      15/    DF78 :                     ;
+      16/    DF78 :                     ;       M       MOVE MEMORY
+      17/    DF78 :                     ;       E       CHANGE MEMORY
+      18/    DF78 :                     ;       G       GO TO PROGRAM
+      19/    DF78 :                     ;       R       PRINT
+      20/    DF78 :                     ;       T       TRACE PROGRAM
+      21/    DF78 :                     ;       @       ASCII CONVERSION
+      22/    DF78 :                     ;       H       PRINTER ON
+      23/    DF78 :                     ;       V       VIEW MEMORY
+      24/    DF78 :                     ;       I       FILL MEMORY
+      25/    DF78 :                     ;       J       JUMP TO TARGET PROGRAM
+      26/    DF78 :                     ;       F       FIND 
+      27/    DF78 :                     ;       Q       HARDWARE LOCATION
+      28/    DF78 :                     ;       D       DISASSEMBLE CODE
+      29/    DF78 :                     ;       K       CONTINUE AFTER BREAK
+      30/    DF78 :                     ;       1       BREAKPOINT ONE
+      31/    DF78 :                     ;       2       BREAKPOINT TWO
+      32/    DF78 :                     ;       &       S1 LOAD PROGRAMME
+      33/    DF78 :                     ;       *       Jump to Start
+      34/    DF78 :                     ;       O       ECHO ON
+      35/    DF78 :                     ;       N       ECHO OFF
+      36/    DF78 :                     ;       U       Jump to user code at vector USERV       
+      37/    DF78 :                     ;
+      38/    DF78 :                     
+      39/    DF78 :                     LDAD            macro arg
+      40/    DF78 :                     ;    if substr(arg, 1, 1) == "#" ; Immediate
+      41/    DF78 :                     ;T EQU substr(arg, 1, strlen(arg) - 1)
+      42/    DF78 :                     ;T       set     substr(arg, 1, 1)
+      43/    DF78 :                     ;	message "\{substr(arg, 1, \{strlen(arg) - 1)}}"
+      44/    DF78 :                             message "root of 81 : \{sqrt(81)}"
+      45/    DF78 :                                  ldaa #{substr(arg, 1, strlen(arg) - 1)}
+      46/    DF78 :                     ;             ldab #{substr(arg, 1, strlen(arg) - 1)}+1
+      47/    DF78 :                     ;    else
+      48/    DF78 :                             message "Not Immediate"
+      49/    DF78 :                     ;    endif
+      50/    DF78 :                                     endm
+      51/    DF78 :                     ;
+      52/    DF78 :                     
+      53/    DF78 :                     ;
+      54/    DF78 :                     ;
+      55/    E000 :                     	ORG $E000
+      56/    E000 :                             ;; Fill up to FFD0 with FF
+      57/    E000 : FF FF FF FF FF FF           dc.b [(*+($E100-*))&$E100-*]$ff
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 7 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF 
+      58/    E100 :                     ;
+      59/    E100 :                             ORG     RSTART          ;V1 has $F800H
+      60/    E100 :                     ;
+      61/    E100 :                     ;       ENTER POWER ON SEQUENCE
+      62/    E100 :                     ;
+      63/    E100 : (MACRO)             	LDAD    #START
+      63/    E100 :                     ;    if substr(#START, 1, 1) == "#" ; Immediate
+      63/    E100 :                     ;T EQU substr(#START, 1, strlen(#START) - 1)
+      63/    E100 :                     ;T       set     substr(#START, 1, 1)
+      63/    E100 :                     ;       message "\{substr(#START, 1, \{strlen(#START) - 1)}}"
+root of 81 : 9
+      63/    E100 :                             message "root of 81 : \{sqrt(81)}"
+> > >smithbug.asm(63) LDAD(6): error: wrong number of operands
+      63/    E100 :                                  ldaa #{substr(#START, 1, strlen(#START) - 1)}
+      63/    E100 :                     ;             ldab #{substr(#START, 1, strlen(#START) - 1)}+1
+      63/    E100 :                     ;    else
+Not Immediate
+      63/    E100 :                             message "Not Immediate"
+      63/    E100 :                     ;    endif
+      64/    E100 : =$E100              START   EQU     *
+      65/    E100 : 8E DF 44                    LDS     #STACK
+      66/    E103 : BF DF 0A                    STS     SP
+      67/    E106 : 7F DF 0D                    CLR     ECHO
+      68/    E109 : CE E1 09                    LDX     #SFE
+      69/    E10C : FF DF 17                    STX     SWIPTR
+      70/    E10F : FF DF 08                    STX     NIO
+      71/    E112 :                     ;
+      72/    E112 :                     ;       ACIA INITIALISE
+      73/    E112 :                     ;
+      74/    E112 : 86 03                       LDAA    #$03    ;RESET CODE
+      75/    E114 : B7 E0 00                    STAA    ACIACS
+      76/    E117 : 01                          NOP
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 8 - 3/9/2024 102250
+
+
+      77/    E118 : 01                          NOP
+      78/    E119 : 01                          NOP
+      79/    E11A : 86 15                       LDAA    #$15    ;CR10:/16, 8N1 NON-INTERRUPT
+      80/    E11C : B7 DF 0C                    STAA    ACIAT
+      81/    E11F :                     ;
+      82/    E11F :                     ;       COMMAND CONTROL
+      83/    E11F :                     ;
+      84/    E11F : B6 DF 0C            CONTRL  LDAA    ACIAT
+      85/    E122 : B7 E0 00                    STAA    ACIACS
+      86/    E125 :                             ;;
+      87/    E125 :                             ;; What is this? Done twice?
+      88/    E125 :                             ;; 
+      89/    E125 : 8E DF 44                    LDS     #STACK  ; SET CONTRL STACK POINTER
+      90/    E128 :                             ;LDS    #TSTACK ; Weird, either dobule or should be TSTACK not #TSTACK
+      91/    E128 : 7F DF 13                    CLR     TFLAG
+      92/    E12B : 7F DF 16                    CLR     BKFLG
+      93/    E12E : 7F DF 6E                    CLR     BKFLG2
+      94/    E131 : CE E1 31                    LDX     #PROMPT
+      95/    E134 : 8D FE                       BSR     PDATA1
+      96/    E136 : 8D FE                       BSR     INCH
+      97/    E138 : 16                          TAB
+      98/    E139 : BD E1 39                    JSR     OUTS
+      99/    E13C :                     ;
+     100/    E13C :                     ; CHECK IF COMMAND IS VALID AND JUMP TO APPLICATION
+     101/    E13C :                     ;
+     102/    E13C : CE E1 3C                    LDX     #FUTABL
+     103/    E13F : E1 00               NXTCHR  CMPB    0,X
+     104/    E141 : 27 FE                       BEQ     GOODCH
+     105/    E143 : 08                          INX
+     106/    E144 : 08                          INX
+     107/    E145 : 08                          INX
+     108/    E146 : 8C E1 46                    CPX     #TBLEND
+     109/    E149 : 26 F4                       BNE     NXTCHR
+     110/    E14B : 7E E1 4B                    JMP     CKCBA ;
+     111/    E14E :                     ;
+     112/    E14E : EE 01               GOODCH  LDX     1,X
+     113/    E150 : 6E 00                       JMP     0,X   ;JUMP TO COMMAND
+     114/    E152 :                     ;
+     115/    E152 :                     ;  IRQ INTERUPT SEQUENCE
+     116/    E152 :                     ;
+     117/    E152 : FE DF 76            USER    LDX USERV
+     118/    E155 : 6E 00                       JMP 0,X
+     119/    E157 :                     ;
+     120/    E157 :                     ;  IRQ INTERUPT SEQUENCE
+     121/    E157 :                     ;
+     122/    E157 : FE DF 02            IO      LDX IOV
+     123/    E15A : 6E 00                       JMP 0,X
+     124/    E15C :                     ;
+     125/    E15C :                     ;  NMI SEQUENCE
+     126/    E15C :                     ;
+     127/    E15C : FE DF 08            POWDWN  LDX NIO
+     128/    E15F : 6E 00                       JMP 0,X
+     129/    E161 :                     ;
+     130/    E161 :                     ;  SWI SEQUENCE
+     131/    E161 :                     ;
+     132/    E161 : FE DF 17            SWI     LDX     SWIPTR
+     133/    E164 : 6E 00                       JMP     0,X
+     134/    E166 :                     ;
+     135/    E166 : 86 3F               LOAD19  LDAA    #$3F
+     136/    E168 : 8D FE                       BSR     OUTCH
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 9 - 3/9/2024 102250
+
+
+     137/    E16A : 20 B3               C1      BRA     CONTRL
+     138/    E16C :                     ;
+     139/    E16C :                     ;  BUILD ADDRESS
+     140/    E16C :                     ;
+     141/    E16C : 8D FE               BADDR   BSR     BYTE
+     142/    E16E : B7 DF 0E                    STAA    XHI
+     143/    E171 : 8D FE                       BSR     BYTE
+     144/    E173 : B7 DF 0F                    STAA    XLOW
+     145/    E176 : FE DF 0E                    LDX     XHI
+     146/    E179 : 39                          RTS
+     147/    E17A :                     ;
+     148/    E17A :                     ;  INPUT ONE BYTE
+     149/    E17A :                     ;
+     150/    E17A : 8D FE               BYTE    BSR     INHEX
+     151/    E17C : 48                          ASLA
+     152/    E17D : 48                          ASLA
+     153/    E17E : 48                          ASLA
+     154/    E17F : 48                          ASLA
+     155/    E180 : 16                          TAB
+     156/    E181 : 8D FE                       BSR     INHEX
+     157/    E183 : 1B                          ABA
+     158/    E184 : 39                          RTS
+     159/    E185 :                     ;
+     160/    E185 :                     ;  OUTPUT LEFT HEX NUMBER
+     161/    E185 :                     ;
+     162/    E185 : 44                  OUTHL   LSRA
+     163/    E186 : 44                          LSRA
+     164/    E187 : 44                          LSRA
+     165/    E188 : 44                          LSRA
+     166/    E189 :                     ;
+     167/    E189 :                     ;  OUTPUT RIGHT HEX NUMBER
+     168/    E189 :                     ;
+     169/    E189 : 84 0F               OUTHR   ANDA    #$F
+     170/    E18B : 8B 30                       ADDA    #$30
+     171/    E18D : 81 39                       CMPA    #$39
+     172/    E18F : 23 FE                       BLS     OUTCH
+     173/    E191 : 8B 07                       ADDA    #$7
+     174/    E193 : 7E E1 93            OUTCH   JMP     OUTEEE
+     175/    E196 : 7E E1 96            INCH    JMP     INEEE
+     176/    E199 :                     ;
+     177/    E199 : 8D F8               PDATA2  BSR     OUTCH
+     178/    E19B : 08                          INX
+     179/    E19C : A6 00               PDATA1  LDAA    0,X
+     180/    E19E : 81 04                       CMPA    #$4
+     181/    E1A0 : 26 F7                       BNE     PDATA2
+     182/    E1A2 : 39                          RTS
+     183/    E1A3 :                     ;
+     184/    E1A3 :                     ; CHANGE MEMORY
+     185/    E1A3 :                     ;
+     186/    E1A3 : 8D C7               CHANGE  BSR     BADDR
+     187/    E1A5 : CE E1 A5            CHA51   LDX     #PROMPT
+     188/    E1A8 : 8D F2                       BSR     PDATA1
+     189/    E1AA : 8D FE                       BSR     OUTXHI
+     190/    E1AC : 8D FE                       BSR     OUT2HS
+     191/    E1AE : FF DF 0E                    STX     XHI
+     192/    E1B1 : 8D E3                       BSR     INCH
+     193/    E1B3 : 81 20                       CMPA    #$20
+     194/    E1B5 : 27 EE                       BEQ     CHA51
+     195/    E1B7 : 81 5E                       CMPA    #$5E
+     196/    E1B9 : 26 FE                       BNE     CHM1
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 10 - 3/9/2024 102250
+
+
+     197/    E1BB : 09                          DEX
+     198/    E1BC : 09                          DEX
+     199/    E1BD : FF DF 0E                    STX     XHI
+     200/    E1C0 : 20 E3                       BRA     CHA51
+     201/    E1C2 : 8D 00               CHM1    BSR     INHEX+2
+     202/    E1C4 : 8D B6                       BSR     BYTE+2
+     203/    E1C6 : 09                          DEX
+     204/    E1C7 : A7 00                       STAA    0,X
+     205/    E1C9 : A1 00                       CMPA    0,X
+     206/    E1CB : 27 D8                       BEQ     CHA51
+     207/    E1CD :                     ;
+     208/    E1CD : 20 97               XBK     BRA     LOAD19
+     209/    E1CF :                     ;
+     210/    E1CF : 8D C5               INHEX   BSR     INCH
+     211/    E1D1 : 80 30                       SUBA    #$30
+     212/    E1D3 : 2B 95                       BMI     C1
+     213/    E1D5 : 81 09                       CMPA    #$9
+     214/    E1D7 : 2F FE                       BLE     IN1HG
+     215/    E1D9 : 81 11                       CMPA    #$11
+     216/    E1DB : 2B 8D                       BMI     C1
+     217/    E1DD : 81 16                       CMPA    #$16
+     218/    E1DF : 2E 89                       BGT     C1
+     219/    E1E1 : 80 07                       SUBA    #$7
+     220/    E1E3 : 39                  IN1HG   RTS
+     221/    E1E4 :                     ;
+     222/    E1E4 :                     ;
+     223/    E1E4 : A6 00               OUT2H   LDAA 0,X
+     224/    E1E6 : 8D 9D                       BSR OUTHL
+     225/    E1E8 : A6 00                       LDAA 0,X
+     226/    E1EA : 08                          INX
+     227/    E1EB : 20 9C                       BRA OUTHR
+     228/    E1ED :                     ;
+     229/    E1ED : 8D F5               OUT4HS  BSR OUT2H
+     230/    E1EF : 8D F3               OUT2HS  BSR OUT2H
+     231/    E1F1 : 86 20               OUTS    LDAA #$20
+     232/    E1F3 : 20 9E                       BRA OUTCH
+     233/    E1F5 :                     ;
+     234/    E1F5 :                     ; SET BREAK POINTS
+     235/    E1F5 :                     ;
+     236/    E1F5 : BD E1 F5            BKPNT2  JSR ADDR
+     237/    E1F8 : FF DF 69                    STX PC1
+     238/    E1FB : A6 00                       LDAA 0,X
+     239/    E1FD : B7 DF 6E                    STAA BKFLG2
+     240/    E200 : 27 CB                       BEQ XBK
+     241/    E202 : 86 3F                       LDAA #$3F
+     242/    E204 : A7 00                       STAA 0,X
+     243/    E206 : BD E2 06            BKPNT   JSR ADDR
+     244/    E209 : FF DF 66                    STX PB2
+     245/    E20C : A6 00                       LDAA 0,X
+     246/    E20E : B7 DF 16                    STAA BKFLG
+     247/    E211 : 27 BA                       BEQ XBK
+     248/    E213 : 86 3F                       LDAA #$3F
+     249/    E215 : A7 00                       STAA 0,X
+     250/    E217 : BD E2 17                    JSR CRLF
+     251/    E21A :                     ;
+     252/    E21A :                     ; FALL INTO GO COMMAND
+     253/    E21A :                     ;
+     254/    E21A : BE DF 0A            CONTG   LDS SP
+     255/    E21D : 3B                          RTI
+     256/    E21E :                     ;
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 11 - 3/9/2024 102250
+
+
+     257/    E21E :                     ; PRINT XHI ADDRESS SUB
+     258/    E21E :                     ;
+     259/    E21E : CE DF 0E            OUTXHI  LDX #XHI
+     260/    E221 : 8D CA                       BSR OUT4HS
+     261/    E223 : FE DF 0E                    LDX XHI
+     262/    E226 : 39                          RTS
+     263/    E227 :                     ;
+     264/    E227 :                     ; VECTORED SWI ROUTINE
+     265/    E227 :                     ;
+     266/    E227 : BF DF 0A            SFE     STS SP
+     267/    E22A : 30                          TSX
+     268/    E22B : 6D 06                       TST 6,X
+     269/    E22D : 26 02                       BNE *+4
+     270/    E22F : 6A 05                       DEC 5,X
+     271/    E231 : 6A 06                       DEC 6,X
+     272/    E233 : 8E DF 62                    LDS #TSTACK             ; ??? What is this
+     273/    E236 : 7D DF 13                    TST TFLAG
+     274/    E239 : 27 FE                       BEQ PRINT
+     275/    E23B : FE DF 69                    LDX PC1
+     276/    E23E : B6 DF 64                    LDAA OPSAVE
+     277/    E241 : A7 00                       STAA 0,X
+     278/    E243 : 7D DF 4F                    TST BFLAG
+     279/    E246 : 27 FE                       BEQ DISPLY
+     280/    E248 : FE DF 6B                    LDX BPOINT
+     281/    E24B : B6 DF 6D                    LDAA BPOINT+2
+     282/    E24E : A7 00                       STAA 0,X
+     283/    E250 : 7E E2 50            DISPLY  JMP RETURN
+     284/    E253 :                     ;
+     285/    E253 :                     ; PRINT REGISTERS
+     286/    E253 :                     ;
+     287/    E253 : FE DF 0A            PRINT   LDX SP
+     288/    E256 : 86 06                       LDAA #6
+     289/    E258 : B7 DF 6F                    STAA MCONT
+     290/    E25B : E6 01                       LDAB 1,X
+     291/    E25D : 58                          ASLB
+     292/    E25E : 58                          ASLB
+     293/    E25F : CE E2 5F                    LDX #CSET
+     294/    E262 :                     ;
+     295/    E262 : 86 2D               DSOOP   LDAA #$2D
+     296/    E264 : 58                          ASLB
+     297/    E265 : 24 FE                       BCC DSOOP1
+     298/    E267 : A6 00                       LDAA 0,X
+     299/    E269 : BD E2 69            DSOOP1  JSR OUTEEE
+     300/    E26C : 08                          INX
+     301/    E26D : 7A DF 6F                    DEC MCONT
+     302/    E270 : 26 F0                       BNE DSOOP
+     303/    E272 : CE E2 72                    LDX #BREG
+     304/    E275 : 8D FE                       BSR PDAT
+     305/    E277 : FE DF 0A                    LDX SP
+     306/    E27A : 08                          INX
+     307/    E27B : 08                          INX
+     308/    E27C : BD E1 EF                    JSR OUT2HS
+     309/    E27F : FF DF 10                    STX TEMP
+     310/    E282 : CE E2 82                    LDX #AREG
+     311/    E285 : 8D FE                       BSR PDAT
+     312/    E287 : FE DF 10                    LDX TEMP
+     313/    E28A : BD E1 EF                    JSR OUT2HS
+     314/    E28D : FF DF 10                    STX TEMP
+     315/    E290 : CE E2 90                    LDX #XREG
+     316/    E293 : 8D FE                       BSR PDAT
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 12 - 3/9/2024 102250
+
+
+     317/    E295 : FE DF 10                    LDX TEMP
+     318/    E298 : 8D FE                       BSR PRTS
+     319/    E29A : FF DF 10                    STX TEMP
+     320/    E29D : 7D DF 13                    TST TFLAG
+     321/    E2A0 : 26 FE                       BNE PNTS
+     322/    E2A2 : CE E2 A2                    LDX #PCTR
+     323/    E2A5 : 8D FE                       BSR PDAT
+     324/    E2A7 : FE DF 10                    LDX TEMP
+     325/    E2AA : 8D FE                       BSR PRTS
+     326/    E2AC : CE E2 AC            PNTS    LDX #SREG
+     327/    E2AF : 8D FE                       BSR PDAT
+     328/    E2B1 : CE DF 0A                    LDX #SP
+     329/    E2B4 : 7D DF 13                    TST TFLAG
+     330/    E2B7 : 26 FE                       BNE PRINTS
+     331/    E2B9 : 8D FE                       BSR PRTS
+     332/    E2BB :                     ;
+     333/    E2BB :                     ; CHECK IF ANY BREAK POINTS ARE SET
+     334/    E2BB :                     ;
+     335/    E2BB : B6 DF 16                    LDAA BKFLG
+     336/    E2BE : 26 FE                       BNE C2
+     337/    E2C0 : FE DF 66                    LDX PB2
+     338/    E2C3 : A7 00                       STAA 0,X
+     339/    E2C5 : B6 DF 6E                    LDAA BKFLG2
+     340/    E2C8 : 27 FE                       BEQ C2
+     341/    E2CA : FE DF 69                    LDX PC1
+     342/    E2CD : A7 00                       STAA 0,X
+     343/    E2CF : 20 FE               C2      BRA CR8
+     344/    E2D1 : 7E E1 9C            PDAT    JMP PDATA1
+     345/    E2D4 :                     ;
+     346/    E2D4 :                     ; SET ECHO FUNCTION
+     347/    E2D4 :                     ;
+     348/    E2D4 : 5F                  ECHON   CLRB
+     349/    E2D5 : 50                  PRNTON  NEGB
+     350/    E2D6 : F7 DF 0D            ECHOFF  STAB    ECHO
+     351/    E2D9 : 20 FE                       BRA     CR8
+     352/    E2DB :                     ;
+     353/    E2DB :                     ;  PRINT STACK POINTER
+     354/    E2DB :                     ;
+     355/    E2DB : E6 00               PRINTS  LDAB    0,X
+     356/    E2DD : A6 01                       LDAA    1,X
+     357/    E2DF : 8B 07                       ADDA    #7
+     358/    E2E1 : C9 00                       ADCB    #0
+     359/    E2E3 : F7 DF 10                    STAB    TEMP
+     360/    E2E6 : B7 DF 11                    STAA    TEMP+1
+     361/    E2E9 : CE DF 10                    LDX     #TEMP
+     362/    E2EC : 7E E1 ED            PRTS    JMP     OUT4HS
+     363/    E2EF :                     ;
+     364/    E2EF :                     ;changes from version 1 are below see 006.jpg
+     365/    E2EF :                     ;
+     366/    E2EF : 20 FE               CR8     BRA     IFILL1
+     367/    E2F1 :                     ;
+     368/    E2F1 :                     ;     SAVE X REGISTER
+     369/    E2F1 :                     ;
+     370/    E2F1 : FF DF 14            SAV     STX     XTEMP
+     371/    E2F4 : 39                          RTS
+     372/    E2F5 :                     ;
+     373/    E2F5 :                     ;       INPUT ONE CHAR INTO A-REGISTER
+     374/    E2F5 :                     ;
+     375/    E2F5 :                     ; |  7  |  6  |  5  |  4  |  3  |  2  |  1  |  0  |
+     376/    E2F5 :                     ; | IRQ |  PE | ROV |  FE | CTS | DCD | TDR | RDR |
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 13 - 3/9/2024 102250
+
+
+     377/    E2F5 :                     ;
+     378/    E2F5 : 8D FA               INEEE   BSR     SAV
+     379/    E2F7 : B6 E0 00            IN1     LDAA    ACIACS
+     380/    E2FA : 47                          ASRA                    ;
+     381/    E2FB : 24 FA                       BCC     IN1     ;RECEIVE NOT READY
+     382/    E2FD : B6 E0 01                    LDAA    ACIADA  ;INPUT CHARACTER
+     383/    E300 : 84 7F                       ANDA    #$7F    ;RESET PARITY BIT
+     384/    E302 : 81 7F                       CMPA    #$7F
+     385/    E304 : 27 F1                       BEQ     IN1     ;IF RUBOUT, GET NEXT CHAR
+     386/    E306 : 7D DF 0D                    TST     ECHO
+     387/    E309 : 2F FE                       BLE     OUTEEE
+     388/    E30B : 39                          RTS
+     389/    E30C :                     ;
+     390/    E30C :                     ;       OUTPUT ONE CHAR 
+     391/    E30C :                     ;
+     392/    E30C : 36                  OUTEEE  PSHA
+     393/    E30D : B6 E0 00            OUTEEE1 LDAA    ACIACS
+     394/    E310 : 47                          ASRA
+     395/    E311 : 47                          ASRA
+     396/    E312 : 24 F9                       BCC     OUTEEE1
+     397/    E314 : 32                          PULA
+     398/    E315 : B7 E0 01                    STAA    ACIADA
+     399/    E318 : 39                          RTS
+     400/    E319 :                     ;
+     401/    E319 :                     ; changes from V1 are above
+     402/    E319 :                     ;
+     403/    E319 :                     ;  HERE ON JUMP COMMAND
+     404/    E319 :                     ;
+     405/    E319 : CE E3 19            JUMP    LDX #TOADD
+     406/    E31C : 8D 01                       BSR ENDADD+3
+     407/    E31E : 8E DF 44                    LDS #STACK
+     408/    E321 : 6E 00                       JMP 0,X
+     409/    E323 :                     ;
+     410/    E323 :                     ;  ASCII IN "@" COMMAND
+     411/    E323 :                     ;
+     412/    E323 : 8D FE               ASCII   BSR BAD2
+     413/    E325 : 08                          INX
+     414/    E326 : 09                  ASC01   DEX
+     415/    E327 : 8D CC               ASC02   BSR INEEE
+     416/    E329 : 81 08                       CMPA #$8
+     417/    E32B : 27 F9                       BEQ ASC01
+     418/    E32D : A7 00                       STAA 0,X
+     419/    E32F : 81 04                       CMPA #$4
+     420/    E331 : 27 FE                       BEQ CR9
+     421/    E333 : 08                          INX
+     422/    E334 : 20 F1                       BRA ASC02
+     423/    E336 :                     ;
+     424/    E336 :                     ;  FILL MEMORY "I" COMMAND
+     425/    E336 :                     ;
+     426/    E336 : 8D FE               IFILL   BSR LIMITS
+     427/    E338 : 8D FE                       BSR VALUE
+     428/    E33A : FE DF 04                    LDX BEGA
+     429/    E33D : 09                          DEX
+     430/    E33E : 08                  IFILL2  INX
+     431/    E33F : A7 00                       STAA 0,X
+     432/    E341 : BC DF 06                    CPX ENDA
+     433/    E344 : 26 F8                       BNE IFILL2
+     434/    E346 : 20 FE               IFILL1  BRA CR9
+     435/    E348 :                     ;
+     436/    E348 :                     ;  INPUT DATA SUB ROUTINE
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 14 - 3/9/2024 102250
+
+
+     437/    E348 :                     ;
+     438/    E348 : CE E3 48            BAD2    LDX #FROMAD
+     439/    E34B : 20 03                       BRA *+5
+     440/    E34D : CE E3 4D            ENDADD  LDX #THRUAD
+     441/    E350 : BD E1 9C                    JSR PDATA1
+     442/    E353 : 7E E1 6C                    JMP BADDR
+     443/    E356 : 8D F0               LIMITS  BSR BAD2
+     444/    E358 : FF DF 04                    STX BEGA
+     445/    E35B : 8D F0                       BSR ENDADD
+     446/    E35D : FF DF 06                    STX ENDA
+     447/    E360 : 7E E3 60                    JMP CRLF
+     448/    E363 : FE E3 63            ADDR    LDX ADASC
+     449/    E366 : 20 E8                       BRA ENDADD+3
+     450/    E368 : CE E3 68            VALUE   LDX #VALASC
+     451/    E36B : BD E1 9C                    JSR PDATA1
+     452/    E36E : 7E E1 7A                    JMP BYTE
+     453/    E371 :                     ;
+     454/    E371 :                     ; BLOCK MOVE "M" COMMAND
+     455/    E371 :                     ;
+     456/    E371 : 8D E3               MOVE    BSR LIMITS
+     457/    E373 : CE E3 73                    LDX #TOADD
+     458/    E376 : 8D D8                       BSR ENDADD+3
+     459/    E378 : FE DF 04                    LDX BEGA
+     460/    E37B : 09                          DEX
+     461/    E37C : 08                  BMC1    INX
+     462/    E37D : A6 00                       LDAA 0,X
+     463/    E37F : FF DF 04                    STX BEGA
+     464/    E382 : FE DF 0E                    LDX XHI
+     465/    E385 : A7 00                       STAA 0,X
+     466/    E387 : 08                          INX
+     467/    E388 : FF DF 0E                    STX XHI
+     468/    E38B : FE DF 04                    LDX BEGA
+     469/    E38E : BC DF 06                    CPX ENDA
+     470/    E391 : 26 E9                       BNE BMC1
+     471/    E393 : 7E E1 1F            CR9     JMP CONTRL
+     472/    E396 :                     ;
+     473/    E396 :                     ;  SEARCH MEMORY "S" COMMAND
+     474/    E396 :                     ;
+     475/    E396 : 8D BE               FIND    BSR LIMITS
+     476/    E398 : 8D CE                       BSR VALUE
+     477/    E39A : 16                          TAB
+     478/    E39B : FE DF 04                    LDX BEGA
+     479/    E39E : 09                          DEX
+     480/    E39F : 08                  SMC1    INX
+     481/    E3A0 : A6 00                       LDAA 0,X
+     482/    E3A2 : 11                          CBA
+     483/    E3A3 : 26 FE                       BNE SMC2
+     484/    E3A5 : FF DF 0E                    STX XHI
+     485/    E3A8 : 8D FE                       BSR CRLF
+     486/    E3AA : BD E2 1E                    JSR OUTXHI
+     487/    E3AD : BC DF 06            SMC2    CPX ENDA
+     488/    E3B0 : 26 ED                       BNE SMC1
+     489/    E3B2 : 20 DF                       BRA CR9
+     490/    E3B4 :                     ;
+     491/    E3B4 :                     ;  SUB ROUTINE TO ADD SPACE
+     492/    E3B4 :                     ;
+     493/    E3B4 : 86 20               SKIP    LDAA #$20
+     494/    E3B6 : BD E3 0C                    JSR OUTEEE
+     495/    E3B9 : 5A                          DECB 
+     496/    E3BA : 26 F8                       BNE SKIP
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 15 - 3/9/2024 102250
+
+
+     497/    E3BC : 39                          RTS
+     498/    E3BD :                     ;
+     499/    E3BD :                     ;  PRINT BYTE IN A REGISTER
+     500/    E3BD :                     ;
+     501/    E3BD : B7 DF 68            PNTBYT  STAA BYTECT
+     502/    E3C0 : CE DF 68                    LDX #BYTECT
+     503/    E3C3 : 7E E1 E4                    JMP OUT2H
+     504/    E3C6 :                     ;
+     505/    E3C6 :                     ;  CARRIAGE RETURN NON PROMPT
+     506/    E3C6 :                     ;
+     507/    E3C6 : CE E3 C6            CRLF    LDX #CRLFAS
+     508/    E3C9 : 7E E1 9C                    JMP PDATA1
+     509/    E3CC :                     ;
+     510/    E3CC :                     ;  DISASSEMBLE "D" COMMAND
+     511/    E3CC :                     ;
+     512/    E3CC : BD E3 48            DISSA   JSR BAD2
+     513/    E3CF : 20 FE                       BRA DISS
+     514/    E3D1 :                     ;
+     515/    E3D1 :                     ;  TRACE COMMAND "T"
+     516/    E3D1 :                     ;
+     517/    E3D1 : BD E3 48            TRACE   JSR     BAD2
+     518/    E3D4 : 8D F0                       BSR     CRLF
+     519/    E3D6 : FE DF 0A                    LDX     SP
+     520/    E3D9 : F6 DF 0E                    LDAB    XHI
+     521/    E3DC : E7 06                       STAB    6,X
+     522/    E3DE : B6 DF 0F                    LDAA    XLOW
+     523/    E3E1 : A7 07                       STAA    7,X
+     524/    E3E3 : 7C DF 13            KONTIN  INC     TFLAG
+     525/    E3E6 : BD E2 53            RETURN  JSR     PRINT
+     526/    E3E9 : FE DF 0A                    LDX     SP
+     527/    E3EC : EE 06                       LDX     6,X
+     528/    E3EE : FF DF 69            DISS    STX     PC1
+     529/    E3F1 : 8D D3               DISIN   BSR     CRLF
+     530/    E3F3 : CE DF 69                    LDX     #PC1
+     531/    E3F6 : BD E1 ED                    JSR     OUT4HS
+     532/    E3F9 : CE DF 4F                    LDX     #BFLAG
+     533/    E3FC : 86 05                       LDAA    #5
+     534/    E3FE : 6F 00               CLEAR   CLR     0,X
+     535/    E400 : 08                          INX
+     536/    E401 : 4A                          DECA
+     537/    E402 : 26 FA                       BNE     CLEAR
+     538/    E404 : FE DF 69                    LDX     PC1
+     539/    E407 : E6 00                       LDAB 0,X
+     540/    E409 : BD E1 EF                    JSR     OUT2HS
+     541/    E40C : FF DF 69                    STX     PC1
+     542/    E40F : A6 00                       LDAA    0,X
+     543/    E411 : B7 DF 66                    STAA    PB2
+     544/    E414 : A6 01                       LDAA    1,X
+     545/    E416 : B7 DF 67                    STAA    PB3
+     546/    E419 : F7 DF 65                    STAB    PB1
+     547/    E41C : 17                          TBA
+     548/    E41D : BD E4 1D                    JSR     TBLKUP
+     549/    E420 : B6 DF 10                    LDAA    TEMP
+     550/    E423 : 81 2A                       CMPA    #$2A
+     551/    E425 : 26 FE                       BNE     OKOP
+     552/    E427 : 7E E4 27                    JMP     NOTBB
+     553/    E42A : B6 DF 65            OKOP    LDAA    PB1
+     554/    E42D : 81 8D                       CMPA    #$8D
+     555/    E42F : 26 FE                       BNE     NEXT
+     556/    E431 : 7C DF 4F                    INC     BFLAG
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 16 - 3/9/2024 102250
+
+
+     557/    E434 : 20 FE                       BRA     PUT1
+     558/    E436 : 84 F0               NEXT    ANDA    #$F0
+     559/    E438 : 81 60                       CMPA    #$60
+     560/    E43A : 27 FE                       BEQ     ISX
+     561/    E43C : 81 A0                       CMPA    #$A0
+     562/    E43E : 27 FE                       BEQ     ISX
+     563/    E440 : 81 E0                       CMPA    #$E0
+     564/    E442 : 27 FE                       BEQ     ISX
+     565/    E444 : 81 80                       CMPA    #$80
+     566/    E446 : 27 FE                       BEQ     IMM
+     567/    E448 : 81 C0                       CMPA    #$C0
+     568/    E44A : 26 FE                       BNE     PUT1
+     569/    E44C : 7C DF 50            IMM     INC     MFLAG
+     570/    E44F : CE E4 4F                    LDX     #SPLBD0
+     571/    E452 : 20 FE                       BRA     PUT
+     572/    E454 : 7C DF 51            ISX     INC     XFLAG
+     573/    E457 : B6 DF 66                    LDAA    PB2
+     574/    E45A : BD E3 BD                    JSR     PNTBYT
+     575/    E45D : CE E4 5D                    LDX     #COMMX
+     576/    E460 : BD E1 9C            PUT     JSR     PDATA1
+     577/    E463 : FE DF 69            PUT1    LDX     PC1
+     578/    E466 : B6 DF 65                    LDAA    PB1
+     579/    E469 : 81 8C                       CMPA    #$8C
+     580/    E46B : 27 FE                       BEQ     BYT3
+     581/    E46D : 81 8E                       CMPA    #$8E
+     582/    E46F : 27 FE                       BEQ     BYT3
+     583/    E471 : 81 CE                       CMPA    #$CE  
+     584/    E473 : 27 FE                       BEQ     BYT3
+     585/    E475 : 84 F0                       ANDA    #$F0
+     586/    E477 : 81 20                       CMPA    #$20
+     587/    E479 : 26 FE                       BNE     NOTB
+     588/    E47B : 7C DF 4F                    INC     BFLAG
+     589/    E47E : 20 FE                       BRA     BYT2
+     590/    E480 : 81 60               NOTB    CMPA    #$60
+     591/    E482 : 25 FE                       BCS     BYT1
+     592/    E484 : 84 30                       ANDA    #$30
+     593/    E486 : 81 30                       CMPA    #$30
+     594/    E488 : 26 FE                       BNE     BYT2
+     595/    E48A : 7C DF 53            BYT3    INC     BITE3
+     596/    E48D : 7D DF 50                    TST     MFLAG
+     597/    E490 : 26 FE                       BNE     BYT31
+     598/    E492 : 86 24                       LDAA    #$24
+     599/    E494 : BD E3 0C                    JSR     OUTEEE
+     600/    E497 : A6 00               BYT31   LDAA    0,X
+     601/    E499 : 08                          INX
+     602/    E49A : FF DF 69                    STX     PC1
+     603/    E49D : BD E3 BD                    JSR     PNTBYT
+     604/    E4A0 : FE DF 69                    LDX     PC1
+     605/    E4A3 : 20 FE                       BRA     BYT21
+     606/    E4A5 : 7C DF 52            BYT2    INC     BITE2
+     607/    E4A8 : A6 00               BYT21   LDAA    0,X
+     608/    E4AA : 08                          INX
+     609/    E4AB : FF DF 69                    STX     PC1
+     610/    E4AE : 7D DF 51                    TST     XFLAG
+     611/    E4B1 : 26 FE                       BNE     BYT1
+     612/    E4B3 : 7D DF 53                    TST     BITE3
+     613/    E4B6 : 26 FE                       BNE     BYT22
+     614/    E4B8 : 7D DF 50                    TST     MFLAG
+     615/    E4BB : 26 FE                       BNE     BYT22
+     616/    E4BD : 16                          TAB
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 17 - 3/9/2024 102250
+
+
+     617/    E4BE : 86 24                       LDAA    #$24
+     618/    E4C0 : BD E3 0C                    JSR     OUTEEE
+     619/    E4C3 : 17                          TBA
+     620/    E4C4 : BD E3 BD            BYT22   JSR     PNTBYT
+     621/    E4C7 : 7D DF 4F            BYT1    TST     BFLAG
+     622/    E4CA : 27 FE                       BEQ     NOTBB
+     623/    E4CC : C6 03                       LDAB    #3
+     624/    E4CE : BD E3 B4                    JSR     SKIP
+     625/    E4D1 : 4F                          CLRA
+     626/    E4D2 : F6 DF 66                    LDAB    PB2
+     627/    E4D5 : 2C FE                       BGE     DPOS
+     628/    E4D7 : 86 FF                       LDAA    #$FF
+     629/    E4D9 : FB DF 6A            DPOS    ADDB    PC2
+     630/    E4DC : B9 DF 69                    ADCA    PC1
+     631/    E4DF : B7 DF 6B                    STAA    BPOINT
+     632/    E4E2 : F7 DF 6C                    STAB    BPOINT+1
+     633/    E4E5 : CE DF 6B                    LDX     #BPOINT
+     634/    E4E8 : BD E1 ED                    JSR     OUT4HS
+     635/    E4EB :                     ;
+     636/    E4EB :                     ; PRINT ASCII VALUE OF INST
+     637/    E4EB :                     ;
+     638/    E4EB : C6 0D               NOTBB   LDAB #$D
+     639/    E4ED : 86 01                       LDAA #1
+     640/    E4EF : 7D DF 52                    TST BITE2
+     641/    E4F2 : 27 FE                       BEQ PAVOI3
+     642/    E4F4 : C6 01                       LDAB #1
+     643/    E4F6 : 7D DF 4F                    TST BFLAG
+     644/    E4F9 : 26 FE                       BNE PAVOI2
+     645/    E4FB : C6 08                       LDAB #8
+     646/    E4FD : 7D DF 50                    TST MFLAG
+     647/    E500 : 26 FE                       BNE PAVOI2
+     648/    E502 : 7D DF 50                    TST MFLAG
+     649/    E505 : 26 FE                       BNE PAVOI2
+     650/    E507 : C6 09                       LDAB #9
+     651/    E509 : 86 02               PAVOI2  LDAA #2
+     652/    E50B : 20 FE                       BRA PAVOI8
+     653/    E50D :                     ;
+     654/    E50D : 7D DF 53            PAVOI3  TST BITE3
+     655/    E510 : 27 FE                       BEQ PAVOI8
+     656/    E512 : 86 03                       LDAA #3
+     657/    E514 : C6 06                       LDAB #6
+     658/    E516 : 7D DF 50                    TST MFLAG
+     659/    E519 : 27 FE                       BEQ PAVOI8
+     660/    E51B : C6 05                       LDAB #5
+     661/    E51D : 36                  PAVOI8  PSHA
+     662/    E51E : BD E3 B4                    JSR SKIP
+     663/    E521 : 33                          PULB
+     664/    E522 : CE DF 65                    LDX #PB1
+     665/    E525 : A6 00               PAVOI4  LDAA 0,X
+     666/    E527 : 81 20                       CMPA #$20
+     667/    E529 : 2F FE                       BLE PAVOI5
+     668/    E52B : 81 60                       CMPA #$60
+     669/    E52D : 2F FE                       BLE PAVOI9
+     670/    E52F : 86 2E               PAVOI5  LDAA #$2E
+     671/    E531 : 08                  PAVOI9  INX
+     672/    E532 : BD E3 0C                    JSR OUTEEE
+     673/    E535 : 5A                          DECB
+     674/    E536 : 26 ED                       BNE PAVOI4
+     675/    E538 : BD E2 F5            NOT1    JSR INEEE
+     676/    E53B : 16                          TAB
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 18 - 3/9/2024 102250
+
+
+     677/    E53C : BD E1 F1                    JSR OUTS
+     678/    E53F : C1 20                       CMPB #$20
+     679/    E541 : 27 FE                       BEQ DOT
+     680/    E543 :                     ;
+     681/    E543 :                     ;  CHECK INPUT COMMAND
+     682/    E543 :                     ;  A, B, C, X, OR S
+     683/    E543 :                     ;
+     684/    E543 : FE DF 0A            CKCBA   LDX SP
+     685/    E546 : 08                          INX
+     686/    E547 : C1 43                       CMPB #$43
+     687/    E549 : 27 FE                       BEQ RDC
+     688/    E54B : 08                          INX
+     689/    E54C : C1 42                       CMPB #$42
+     690/    E54E : 27 FE                       BEQ RDC
+     691/    E550 : 08                          INX
+     692/    E551 : C1 41                       CMPB #$41
+     693/    E553 : 27 FE                       BEQ RDC
+     694/    E555 : 08                          INX
+     695/    E556 : C1 58                       CMPB #$58
+     696/    E558 : 27 FE                       BEQ RDX
+     697/    E55A : CE DF 0A                    LDX #SP
+     698/    E55D : C1 53                       CMPB #$53
+     699/    E55F : 26 FE                       BNE RETNOT
+     700/    E561 : BD E1 7A            RDX     JSR BYTE
+     701/    E564 : A7 00                       STAA 0,X
+     702/    E566 : 08                          INX
+     703/    E567 : BD E1 7A            RDC     JSR BYTE
+     704/    E56A : A7 00                       STAA 0,X
+     705/    E56C : BD E3 C6                    JSR CRLF
+     706/    E56F : BD E2 53                    JSR PRINT
+     707/    E572 :                     ;
+     708/    E572 :                     ;  WILL RETURN HERE IN TRACE
+     709/    E572 :                     ;
+     710/    E572 : 20 C4                       BRA NOT1
+     711/    E574 : 7E E1 1F            RETNOT  JMP CONTRL
+     712/    E577 : 7D DF 13            DOT     TST TFLAG
+     713/    E57A : 26 FE                       BNE DOT1
+     714/    E57C : 7E E3 F1                    JMP DISIN
+     715/    E57F :                     ;
+     716/    E57F : C6 3F               DOT1    LDAB #$3F
+     717/    E581 : B6 DF 65                    LDAA PB1
+     718/    E584 : 81 8D                       CMPA #$8D
+     719/    E586 : 26 FE                       BNE TSTB
+     720/    E588 : FE DF 6B                    LDX BPOINT
+     721/    E58B : FF DF 69                    STX PC1
+     722/    E58E : 7F DF 4F                    CLR BFLAG
+     723/    E591 : 7D DF 4F            TSTB    TST BFLAG
+     724/    E594 : 27 FE                       BEQ TSTJ
+     725/    E596 : FE DF 6B                    LDX BPOINT
+     726/    E599 : A6 00                       LDAA 0,X
+     727/    E59B : B7 DF 6D                    STAA BPOINT+2
+     728/    E59E : E7 00                       STAB 0,X
+     729/    E5A0 : 20 FE                       BRA EXEC
+     730/    E5A2 :                     ;
+     731/    E5A2 : 81 6E               TSTJ    CMPA #$6E
+     732/    E5A4 : 27 FE                       BEQ ISXD
+     733/    E5A6 : 81 AD                       CMPA #$AD
+     734/    E5A8 : 27 FE                       BEQ ISXD
+     735/    E5AA : 81 7E                       CMPA #$7E
+     736/    E5AC : 27 FE                       BEQ ISJ
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 19 - 3/9/2024 102250
+
+
+     737/    E5AE : 81 BD                       CMPA #$BD
+     738/    E5B0 : 26 FE                       BNE NOTJ
+     739/    E5B2 : FE DF 66            ISJ     LDX PB2
+     740/    E5B5 : FF DF 69                    STX PC1
+     741/    E5B8 : 20 FE                       BRA EXEC
+     742/    E5BA : FE DF 0A            ISXD    LDX SP
+     743/    E5BD : A6 05                       LDAA 5,X
+     744/    E5BF : BB DF 66                    ADDA PB2
+     745/    E5C2 : B7 DF 6A                    STAA PC2
+     746/    E5C5 : A6 04                       LDAA 4,X
+     747/    E5C7 : 89 00                       ADCA #0
+     748/    E5C9 : B7 DF 69                    STAA PC1
+     749/    E5CC : 20 FE                       BRA EXEC
+     750/    E5CE :                     ;
+     751/    E5CE : FE DF 0A            NOTJ    LDX SP
+     752/    E5D1 : 81 39                       CMPA #$39
+     753/    E5D3 : 26 FE                       BNE NOTRTS
+     754/    E5D5 : EE 08               NOTJ1   LDX 8,X
+     755/    E5D7 : 20 FE                       BRA EXR
+     756/    E5D9 :                     ;
+     757/    E5D9 : 81 38               NOTRTS  CMPA #$38
+     758/    E5DB : 26 FE                       BNE NOTRTI
+     759/    E5DD : EE 0D                       LDX 13,X
+     760/    E5DF : FF DF 69            EXR     STX PC1
+     761/    E5E2 : 81 3F               NOTRTI  CMPA #$3F
+     762/    E5E4 : 27 FE                       BEQ NONO
+     763/    E5E6 : 81 3E                       CMPA #$3E
+     764/    E5E8 : 27 FE                       BEQ NONO
+     765/    E5EA :                     ;
+     766/    E5EA : FE DF 69            EXEC    LDX PC1
+     767/    E5ED : A6 00                       LDAA 0,X
+     768/    E5EF : B7 DF 64                    STAA OPSAVE
+     769/    E5F2 : E7 00                       STAB 0,X
+     770/    E5F4 : E1 00                       CMPB 0,X
+     771/    E5F6 : 26 FE                       BNE CKROM
+     772/    E5F8 : 7E E2 1A                    JMP CONTG
+     773/    E5FB :                     ;
+     774/    E5FB : 7E E1 66            NONO    JMP LOAD19
+     775/    E5FE :                     ;
+     776/    E5FE : B6 DF 69            CKROM   LDAA PC1
+     777/    E601 : 81 E0                       CMPA #$E0
+     778/    E603 : 25 F6                       BCS NONO
+     779/    E605 :                     ;
+     780/    E605 :                     ;  GET JSR OR JMP
+     781/    E605 :                     ;
+     782/    E605 : FE DF 0A                    LDX SP
+     783/    E608 : B6 DF 65                    LDAA PB1
+     784/    E60B : 81 7E                       CMPA #$7E
+     785/    E60D : 27 C6                       BEQ NOTJ1
+     786/    E60F : 81 BD                       CMPA #$BD
+     787/    E611 : 26 E8                       BNE NONO
+     788/    E613 : EE 06                       LDX 6,X
+     789/    E615 : 08                          INX
+     790/    E616 : 08                          INX
+     791/    E617 : 08                          INX
+     792/    E618 : 20 9B                       BRA ISJ+3
+     793/    E61A :                     ;
+     794/    E61A :                     ;Disassembler "PSH A = MISSING A" bug removed......
+     795/    E61A :                     ;
+     796/    E61A :                     ;  INSTRUCTION NMEMONIC LOOKUP
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 20 - 3/9/2024 102250
+
+
+     797/    E61A :                     ;  ROUTINE FOR 68XX OP CODES
+     798/    E61A :                     ;
+     799/    E61A : 81 40               TBLKUP CMPA #$40
+     800/    E61C : 24 FE                       BCC IMLR6
+     801/    E61E : BD E6 1E            IMLR1   JSR PNT3C
+     802/    E621 : B6 DF 65                    LDAA PB1
+     803/    E624 : 81 32                       CMPA #$32
+     804/    E626 : 27 FE                       BEQ IMLR3
+     805/    E628 : 81 36                       CMPA #$36  ;had £ instead of #
+     806/    E62A : 27 FE                       BEQ IMLR3
+     807/    E62C : 81 33                       CMPA #$33
+     808/    E62E : 27 FE                       BEQ IMLR4
+     809/    E630 : 81 37                       CMPA #$37
+     810/    E632 : 27 FE                       BEQ IMLR4
+     811/    E634 : CE E6 34            IMLR2   LDX #BLANK
+     812/    E637 : 20 FE                       BRA IMLR5
+     813/    E639 :                     ;
+     814/    E639 : CE E6 39            IMLR3   LDX #PNTA
+     815/    E63C : 20 FE                       BRA IMLR5       ;end of "bug removed"
+     816/    E63E :                     ;
+     817/    E63E : CE E6 3E            IMLR4   LDX #PNTB
+     818/    E641 : 7E E1 9C            IMLR5   JMP PDATA1
+     819/    E644 : 81 4E               IMLR6   CMPA #$4E
+     820/    E646 : 27 FE                       BEQ IMLR7
+     821/    E648 : 81 5E                       CMPA #$5E
+     822/    E64A : 26 FE                       BNE IMLR8
+     823/    E64C :                     ;
+     824/    E64C : 4F                  IMLR7   CLRA
+     825/    E64D : 20 CF                       BRA IMLR1
+     826/    E64F :                     ;
+     827/    E64F : 81 80               IMLR8   CMPA #$80
+     828/    E651 : 24 FE                       BCC IMLR9
+     829/    E653 : 84 4F                       ANDA #$4F
+     830/    E655 : BD E6 55                    JSR PNT3C
+     831/    E658 : B6 DF 10                    LDAA TEMP
+     832/    E65B : 81 2A                       CMPA #$2A
+     833/    E65D : 27 D5                       BEQ IMLR2
+     834/    E65F : B6 DF 65                    LDAA PB1
+     835/    E662 : 81 60                       CMPA #$60
+     836/    E664 : 24 CE                       BCC IMLR2
+     837/    E666 : 84 10                       ANDA #$10
+     838/    E668 : 27 CF                       BEQ IMLR3
+     839/    E66A : 20 D2                       BRA IMLR4
+     840/    E66C :                     ;
+     841/    E66C : 84 3F               IMLR9   ANDA #$3F
+     842/    E66E : 81 0F                       CMPA #$F
+     843/    E670 : 27 DA                       BEQ IMLR7
+     844/    E672 : 81 07                       CMPA #$7
+     845/    E674 : 27 D6                       BEQ IMLR7
+     846/    E676 : 84 0F                       ANDA #$F
+     847/    E678 : 81 03                       CMPA #$3
+     848/    E67A : 27 D0                       BEQ IMLR7
+     849/    E67C : 81 0C                       CMPA #$C
+     850/    E67E : 2C FE                       BGE IMLR10
+     851/    E680 : 8B 50                       ADDA #$50
+     852/    E682 : BD E6 82                    JSR PNT3C
+     853/    E685 : B6 DF 65                    LDAA PB1
+     854/    E688 : 84 40                       ANDA #$40
+     855/    E68A : 27 AD                       BEQ IMLR3
+     856/    E68C : 20 B0                       BRA IMLR4
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 21 - 3/9/2024 102250
+
+
+     857/    E68E :                     ;
+     858/    E68E : B6 DF 65            IMLR10  LDAA PB1
+     859/    E691 : 81 8D                       CMPA #$8D
+     860/    E693 : 26 FE                       BNE IMLR11
+     861/    E695 : 86 53                       LDAA #$53
+     862/    E697 : 20 85                       BRA IMLR1
+     863/    E699 :                     ;
+     864/    E699 : 81 C0               IMLR11  CMPA #$C0
+     865/    E69B : 24 FE                       BCC IMLR12
+     866/    E69D : 81 9D                       CMPA #$9D
+     867/    E69F : 27 AB                       BEQ IMLR7
+     868/    E6A1 : 84 0F                       ANDA #$F
+     869/    E6A3 : 8B 50                       ADDA #$50
+     870/    E6A5 : 20 FE                       BRA IMLR13
+     871/    E6A7 :                     ;
+     872/    E6A7 : 84 0F               IMLR12  ANDA #$F
+     873/    E6A9 : 8B 52                       ADDA #$52
+     874/    E6AB : 81 60                       CMPA #$60
+     875/    E6AD : 2D 9D                       BLT IMLR7
+     876/    E6AF :                     ;
+     877/    E6AF : 7E E6 1E            IMLR13  JMP IMLR1
+     878/    E6B2 :                     ;
+     879/    E6B2 : 5F                  PNT3C   CLRB
+     880/    E6B3 : B7 DF 10                    STAA TEMP
+     881/    E6B6 : 48                          ASLA
+     882/    E6B7 : BB DF 10                    ADDA TEMP
+     883/    E6BA : C9 00                       ADCB #$0
+     884/    E6BC : CE E6 BC                    LDX #TBL
+     885/    E6BF : FF DF 14                    STX XTEMP
+     886/    E6C2 : BB DF 15                    ADDA XTEMP+1
+     887/    E6C5 : F9 DF 14                    ADCB XTEMP
+     888/    E6C8 : F7 DF 14                    STAB XTEMP
+     889/    E6CB : B7 DF 15                    STAA XTEMP+1
+     890/    E6CE : FE DF 14                    LDX XTEMP
+     891/    E6D1 : A6 00                       LDAA 0,X
+     892/    E6D3 : B7 DF 10                    STAA TEMP
+     893/    E6D6 : 8D FE                       BSR OUTA
+     894/    E6D8 : A6 01                       LDAA 1,X
+     895/    E6DA : 8D FE                       BSR OUTA
+     896/    E6DC : A6 02                       LDAA 2,X
+     897/    E6DE :                     ;
+     898/    E6DE : 7E E3 0C            OUTA    JMP     OUTEEE
+     899/    E6E1 :                     ;
+     900/    E6E1 :                     ;  "V" COMMAND
+     901/    E6E1 :                     ;
+     902/    E6E1 :                     ; >V 
+     903/    E6E1 :                     ; FROM ADDR DF71
+     904/    E6E1 :                     ; DF71 20 0B 10 1D  6E BC 7B D4  AA 0B 88 2A  FA 44 0E FA  
+     905/    E6E1 :                     ;      ..........*.D..
+     906/    E6E1 :                     ;
+     907/    E6E1 :                     ; DF71 20 0B 10 1D  6E BC 7B D4  AA 0B 88 2A  FA 44 0E FA     ..........*.D..
+     908/    E6E1 :                     ;
+     909/    E6E1 : BD E3 48            VIEW    JSR     BAD2
+     910/    E6E4 : 86 08               VCOM1   LDAA    #8
+     911/    E6E6 : B7 DF 6F                    STAA    MCONT
+     912/    E6E9 : BD E3 C6            VCOM5   JSR     CRLF
+     913/    E6EC : BD E2 1E                    JSR     OUTXHI
+     914/    E6EF : C6 10                       LDAB    #$10
+     915/    E6F1 : BD E1 EF            VCOM9   JSR     OUT2HS
+     916/    E6F4 : 5A                          DECB
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 22 - 3/9/2024 102250
+
+
+     917/    E6F5 : C5 03                       BITB    #3
+     918/    E6F7 : 26 FE                       BNE     VCOM10
+     919/    E6F9 : BD E1 F1                    JSR     OUTS
+     920/    E6FC : C1 00                       CMPB    #$0
+     921/    E6FE : 26 F1               VCOM10  BNE     VCOM9
+     922/    E700 : =>UNDEFINED             IFDEF ORIG
+     923/    E700 :                             JSR     CRLF            ; New line
+     924/    E700 :                             LDAB    #$5             ; Skip 5 spaces
+     925/    E700 : =>TRUE                  ELSE
+     926/    E700 : C6 04                       LDAB    #$4             ; Skip 4 spaces
+     927/    E702 : [922]                   ENDIF
+     928/    E702 : BD E3 B4                    JSR     SKIP            ; Skip
+     929/    E705 : FE DF 0E                    LDX     XHI
+     930/    E708 : C6 10                       LDAB    #$10
+     931/    E70A : A6 00               VCOM2   LDAA    0,X
+     932/    E70C : 81 20                       CMPA    #$20
+     933/    E70E : 25 FE                       BCS     VCOM3
+     934/    E710 : 81 5F                       CMPA    #$5F
+     935/    E712 : 25 FE                       BCS     VCOM4
+     936/    E714 : 86 2E               VCOM3   LDAA    #$2E
+     937/    E716 : 8D C6               VCOM4   BSR     OUTA            ; LBSR OUTEEE
+     938/    E718 : 08                          INX
+     939/    E719 : 5A                          DECB
+     940/    E71A : 26 EE                       BNE     VCOM2
+     941/    E71C : FF DF 0E                    STX     XHI
+     942/    E71F : 7A DF 6F                    DEC     MCONT
+     943/    E722 : 26 C5                       BNE     VCOM5
+     944/    E724 : BD E2 F5                    JSR     INEEE
+     945/    E727 : 81 20                       CMPA    #$20
+     946/    E729 : 27 B9                       BEQ     VCOM1
+     947/    E72B : 81 56                       CMPA    #$56
+     948/    E72D : 27 B2                       BEQ     VIEW
+     949/    E72F : 7E E1 1F                    JMP     CONTRL
+     950/    E732 :                     ;
+     951/    E732 :                     ; MNKEMONIC TABLE
+     952/    E732 :                     ;
+     953/    E732 : 2A 2A 2A 4E 4F 50   TBL     FCC "***NOPNOP***"
+                    4E 4F 50 2A 2A 2A 
+     954/    E73E : 2A 2A 2A 2A 2A 2A           FCC "******TAPTPA"
+                    54 41 50 54 50 41 
+     955/    E74A : 49 4E 58 44 45 58           FCC "INXDEXCLVSEV"
+                    43 4C 56 53 45 56 
+     956/    E756 : 43 4C 43 53 45 43           FCC "CLCSECCLISEI"
+                    43 4C 49 53 45 49 
+     957/    E762 : 53 42 41 43 42 41           FCC "SBACBA******"
+                    2A 2A 2A 2A 2A 2A 
+     958/    E76E : 2A 2A 2A 2A 2A 2A           FCC "******TABTBA"
+                    54 41 42 54 42 41 
+     959/    E77A : 2A 2A 2A 44 41 41           FCC "***DAA***ABA"
+                    2A 2A 2A 41 42 41 
+     960/    E786 : 2A 2A 2A 2A 2A 2A           FCC "************"
+                    2A 2A 2A 2A 2A 2A 
+     961/    E792 : 42 52 41 2A 2A 2A           FCC "BRA***BHIBLS"
+                    42 48 49 42 4C 53 
+     962/    E79E : 42 43 43 42 43 53           FCC "BCCBCSBNEBEQ"
+                    42 4E 45 42 45 51 
+     963/    E7AA : 42 56 43 42 56 53           FCC "BVCBVSBPLBMI"
+                    42 50 4C 42 4D 49 
+     964/    E7B6 : 42 47 45 42 4C 54           FCC "BGEBLTBGTBLE"
+                    42 47 54 42 4C 45 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 23 - 3/9/2024 102250
+
+
+     965/    E7C2 : 54 53 58 49 4E 53           FCC "TSXINSPULPUL"
+                    50 55 4C 50 55 4C 
+     966/    E7CE : 44 45 53 54 58 53           FCC "DESTXSPSHPSH"
+                    50 53 48 50 53 48 
+     967/    E7DA : 2A 2A 2A 52 54 53           FCC "***RTS***RTI"
+                    2A 2A 2A 52 54 49 
+     968/    E7E6 : 2A 2A 2A 2A 2A 2A           FCC "******WAISWI"
+                    57 41 49 53 57 49 
+     969/    E7F2 : 4E 45 47 2A 2A 2A           FCC "NEG******COM"
+                    2A 2A 2A 43 4F 4D 
+     970/    E7FE : 4C 53 52 2A 2A 2A           FCC "LSR***RORASR"
+                    52 4F 52 41 53 52 
+     971/    E80A : 41 53 4C 52 4F 4C           FCC "ASLROLDEC***"
+                    44 45 43 2A 2A 2A 
+     972/    E816 : 49 4E 43 54 53 54           FCC "INCTSTJMPCLR"
+                    4A 4D 50 43 4C 52 
+     973/    E822 : 53 55 42 43 4D 50           FCC "SUBCMPSBCBSR"
+                    53 42 43 42 53 52 
+     974/    E82E : 41 4E 44 42 49 54           FCC "ANDBITLDASTA"
+                    4C 44 41 53 54 41 
+     975/    E83A : 45 4F 52 41 44 43           FCC "EORADCORAADD"
+                    4F 52 41 41 44 44 
+     976/    E846 : 43 50 58 4A 53 52           FCC "CPXJSRLDSSTS"
+                    4C 44 53 53 54 53 
+     977/    E852 : 4C 44 58 53 54 58           FCC "LDXSTX"
+     978/    E858 : 23 24               SPLBD0  FCC "#$"
+     979/    E85A : 04                          FCB $04
+     980/    E85B : 2C 58               COMMX   FCC ",X"                ; $2C,$58
+     981/    E85D : 04                          FCB $04
+     982/    E85E : 20 20 20            BLANK   FCC "   "               ; $20,$20,$20
+     983/    E861 : 04                          FCB $04
+     984/    E862 : 41 20               PNTA    FCC "A "                ; Like LDAA rather than LDA A
+     985/    E864 : 04                          FCB $04
+     986/    E865 : 42 20               PNTB    FCC "B "                ;
+     987/    E867 : 04                          FCB $04
+     988/    E868 : =>UNDEFINED             IFDEF ORIG
+     989/    E868 :                     PROMPT  FCB $D,$A,$15,$13,$3E,$04 ; "\r\n^U^Q>^D"
+     990/    E868 :                     BREG    FCB $20,$42,$3D,$04
+     991/    E868 :                     AREG    FCB $41,$3D,$04
+     992/    E868 :                     XREG    FCB $58,$3D,$04
+     993/    E868 :                     SREG    FCB $53,$3D,$04
+     994/    E868 :                     PCTR    FCB $50,$43,$3D,$04
+     995/    E868 :                     CSET    FCB $48,$49,$4E,$5A,$56,$43
+     996/    E868 :                     CRLFAS  FCB $0D,$0A,$15,$04
+     997/    E868 :                     ADASC   FCB $0D,$0A
+     998/    E868 :                             FCB $42,$4B,$41,$44,$44,$52,$20,$04
+     999/    E868 :                     FROMAD  FCB $0D,$0A,$46,$52,$4F,$4D,$20
+    1000/    E868 :                             FCB $41,$44,$44,$52,$20,$04
+    1001/    E868 :                     THRUAD  FCB $0D,$0A,$54,$48,$52,$55,$20,$41
+    1002/    E868 :                             FCB $44,$44,$52,$20,$04
+    1003/    E868 :                     TOADD   FCB $54,$4F,$20,$41,$44,$44,$52,$20,$04
+    1004/    E868 :                     VALASC  FCB $56,$41,$4C,$55,$45,$20,$04
+    1005/    E868 : =>TRUE                  ELSE
+    1006/    E868 : 0D 0A 3E 20         PROMPT  FCC "\r\n> "            ; $D,$A,$3E,$20,$04
+    1007/    E86C : 04                  	FCB $04
+    1008/    E86D : 20 42 3D            BREG    FCC " B="
+    1009/    E870 : 04                          FCB $04              ; FCB $20,$42,$3D,$04
+    1010/    E871 : 41 3D               AREG    FCC "A="
+    1011/    E873 : 04                          FCB $04
+    1012/    E874 : 58 3D               XREG    FCC "X="
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 24 - 3/9/2024 102250
+
+
+    1013/    E876 : 04                          FCB $04
+    1014/    E877 : 53 3D               SREG    FCC "S="
+    1015/    E879 : 04                          FCB $04
+    1016/    E87A : 50 43 3D            PCTR    FCC "PC="
+    1017/    E87D : 04                          FCB $04
+    1018/    E87E : 48 49 4E 5A 56 43   CSET    FCC "HINZVC"            ; $48,$49,$4E,$5A,$56,$43
+    1019/    E884 : 0D 0A               CRLFAS  FCC "\r\n"
+    1020/    E886 : 04                          FCB $04
+    1021/    E887 : 0D 0A 42 4B 41 44   ADASC   FCC "\r\nBKADDR "       ; $42,$4B,$41,$44,$44,$52,$20
+                    44 52 20 
+    1022/    E890 : 04                          FCB $04
+    1023/    E891 : 0D 0A 46 52 4F 4D   FROMAD  FCB "\r\nFROM ADDR "    ; $0D,$0A,$46,$52,$4F,$4D,$20,$41,$44,$44,$52,$20
+                    20 41 44 44 52 20 
+    1024/    E89D : 04                          FCB $04
+    1025/    E89E : 0D 0A 54 48 52 55   THRUAD  FCC "\r\nTHRU ADDR "    ; $0D,$0A,$54,$48,$52,$55,$20,$41,$44,$44,$52,$20
+                    20 41 44 44 52 20 
+    1026/    E8AA : 04                          FCB $04
+    1027/    E8AB : 54 4F 20 41 44 44   TOADD   FCB "TO ADDR "          ; $54,$4F,$20,$41,$44,$44,$52,$20
+                    52 20 
+    1028/    E8B3 : 04                          FCB $04
+    1029/    E8B4 : 56 41 4C 55 45 20   VALASC  FCB "VALUE "            ; $56,$41,$4C,$55,$45,$20
+    1030/    E8BA : 04                          FCB $04
+    1031/    E8BB : [988]                   ENDIF
+    1032/    E8BB :                     ;
+    1033/    E8BB :                     ;   COMMAND JUMP TABLE
+    1034/    E8BB :                     ;
+    1035/    E8BB : 4D                  FUTABL  FCC "M"
+    1036/    E8BC : E3 71                       FDB MOVE
+    1037/    E8BE : 45                          FCC "E"
+    1038/    E8BF : E1 A3                       FDB CHANGE
+    1039/    E8C1 : 47                          FCC "G"
+    1040/    E8C2 : E2 1A                       FDB CONTG               ; Go command
+    1041/    E8C4 : 52                          FCC "R"
+    1042/    E8C5 : E2 53                       FDB PRINT
+    1043/    E8C7 : 54                          FCC "T"
+    1044/    E8C8 : E3 D1                       FDB TRACE
+    1045/    E8CA : 40                          FCC "@"
+    1046/    E8CB : E3 23                       FDB ASCII
+    1047/    E8CD : 48                          FCC "H"
+    1048/    E8CE : E2 D5                       FDB PRNTON
+    1049/    E8D0 : 56                          FCC "V"
+    1050/    E8D1 : E6 E1                       FDB VIEW
+    1051/    E8D3 : 49                          FCC "I"
+    1052/    E8D4 : E3 36                       FDB IFILL
+    1053/    E8D6 : 4A                          FCC "J"
+    1054/    E8D7 : E3 19                       FDB JUMP
+    1055/    E8D9 : 46                          FCC "F"
+    1056/    E8DA : E3 96                       FDB FIND
+    1057/    E8DC : 51                          FCC "Q"
+    1058/    E8DD : 80 20                       FDB $8020
+    1059/    E8DF : 44                          FCC "D"
+    1060/    E8E0 : E3 CC                       FDB DISSA
+    1061/    E8E2 : 4B                          FCC "K"
+    1062/    E8E3 : E3 E3                       FDB KONTIN              ; Continue, Trace
+    1063/    E8E5 :                     ;
+    1064/    E8E5 :                     ; Break points
+    1065/    E8E5 :                     ;       FCC "1"
+    1066/    E8E5 : 5B                          FCC "["
+    1067/    E8E6 : E2 06                       FDB BKPNT
+    1068/    E8E8 :                     ;       FCC "2"
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 25 - 3/9/2024 102250
+
+
+    1069/    E8E8 : 5D                          FCC "]"
+    1070/    E8E9 : E1 F5                       FDB BKPNT2
+    1071/    E8EB : 26                          FCC "&"
+    1072/    E8EC : E8 EC                       FDB SLOAD               ; new for V2 was FDB $7283
+    1073/    E8EE :                             ;;
+    1074/    E8EE :                             ;; Didn't see this before
+    1075/    E8EE :                             ;; 
+    1076/    E8EE : 2A                          FCC "*"
+    1077/    E8EF : E1 00                       FDB START               ; Hard coded, not a great idea (was $F800)
+    1078/    E8F1 : 4F                          FCC "O"
+    1079/    E8F2 : E2 D4                       FDB ECHON
+    1080/    E8F4 : 4E                          FCC "N"
+    1081/    E8F5 : E2 D6                       FDB ECHOFF
+    1082/    E8F7 : 55                          FCC "U"
+    1083/    E8F8 : E1 52                       FDB USER
+    1084/    E8FA : =$E8FA              TBLEND  EQU *            
+    1085/    E8FA :                     ;
+    1086/    E8FA :                     ;       ADDED TO VERSION 2:
+    1087/    E8FA :                     ;       MOTOROLA "S" LOADER PROGRAMME "S1" STARTS LOAD
+    1088/    E8FA :                     ;       END OF LOAD "S9" RUN START END PLUS ADDRESS
+    1089/    E8FA :                     ;
+    1090/    E8FA :                     ;       "S" LOADER PROGRAMME START
+    1091/    E8FA :                     ;
+    1092/    E8FA : 0D 0A 54 68 69 73   S1STRING        FCC     "\r\nThis S1 load has entered system scratch area\r\n"
+                    20 53 31 20 6C 6F 
+                    61 64 20 68 61 73 
+                    20 65 6E 74 65 72 
+                    65 64 20 73 79 73 
+                    74 65 6D 20 73 63 
+                    72 61 74 63 68 20 
+                    61 72 65 61 0D 0A 
+    1093/    E92A : 04                                  FCB     $04
+    1094/    E92B :                     ;
+    1095/    E92B :                     ; S1 13 2000 BD FC BC 86 01 20 07 D6 F1 CB 10 D7 F1 48 BD FE 3C
+    1096/    E92B :                     ;
+    1097/    E92B :                     ; ADDRESS  = $20 (Hi)
+    1098/    E92B :                     ; ADDRESS1 = $00 (Lo)
+    1099/    E92B :                     ;
+    1100/    E92B : =$E92B              SLOAD   EQU     *
+    1101/    E92B : 36                          PSHA                    ; Save A register
+    1102/    E92C : FF DF 70                    STX     TEMPX1          ; Save X register
+    1103/    E92F : 8D FE               GOAGAIN BSR     GETCHAR         ; Get first character from ACIA  
+    1104/    E931 : 81 53                       CMPA    #"S"            ; Is it "S"
+    1105/    E933 : 26 FA                       BNE     GOAGAIN         ; If not go read again
+    1106/    E935 : 8D FE                       BSR     GETCHAR         ; Get second character in frame
+    1107/    E937 : 81 39                       CMPA    #"9"            ; Is it "9"
+    1108/    E939 : 27 FE                       BEQ     RECOVER         ; If "9" go and end read
+    1109/    E93B : 81 31                       CMPA    #"1"            ; Is it a "1"
+    1110/    E93D : 26 F0                       BNE     GOAGAIN         ; If no then go start again
+    1111/    E93F :                     ; Okay we've got S1
+    1112/    E93F : 7F DF 75                    CLR     TEMPA           ; Clear Frame length
+    1113/    E942 : 8D FE                       BSR     GETHEX          ; Get frame length from input stream
+    1114/    E944 : 80 02                       SUBA    #$02            ; Subtract the checksum
+    1115/    E946 :                     ; Save the count
+    1116/    E946 : B7 DF 74                    STAA    BYTESTORE       ; Save frame length
+    1117/    E949 : 8D FE                       BSR     GETADD          ; Read next two bytes for dest address
+    1118/    E94B : 8D FE               GETCNT  BSR     GETHEX          ; Get the byte number
+    1119/    E94D : 7A DF 74                    DEC     BYTESTORE       ; decrement counter
+    1120/    E950 : 27 FE                       BEQ     INCOUNT         ; If zero go to increment byte count
+    1121/    E952 : A7 00                       STAA    0,X             ; Store read byte into memory
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 26 - 3/9/2024 102250
+
+
+    1122/    E954 : A1 00                       CMPA    0,X             ; Test if RAM OK
+    1123/    E956 : 26 FE                       BNE     QUESTN          ; If write failed send Question and abort
+    1124/    E958 : 08                          INX                     ; Increment address pointer
+    1125/    E959 : =>UNDEFINED             IFDEF ORIG
+    1126/    E959 :                             ; bad op code: CMPX  UPRAM
+    1127/    E959 :                     ;;;
+    1128/    E959 :                     ;;; @FIXME: Need to fix this check for S1DUMP into Scratch RAM
+    1129/    E959 :                     ;;;
+    1130/    E959 :                             CPX     #UPRAM          ; Is it the system scratch area
+    1131/    E959 :                             BGT     S1EXIT          ; Abort if close to system scratch
+    1132/    E959 : [1125]                  ENDIF
+    1133/    E959 : 20 F0                       BRA     GETCNT          ; go get another byte
+    1134/    E95B :                     ;
+    1135/    E95B : CE E8 FA            S1EXIT  LDX     #S1STRING       ; Protect System Scratch Abort S1
+    1136/    E95E : 8D FE                       BSR     OUTSTR          ; Print abort string
+    1137/    E960 : 20 FE                       BRA     RECOVER         ; Back to console prompt
+    1138/    E962 :                     ;
+    1139/    E962 : 7C DF 75            INCOUNT INC     TEMPA           ; Increment tempa 
+    1140/    E965 : 27 C8                       BEQ     GOAGAIN         ; If zero go for another frame
+    1141/    E967 : 86 3F               QUESTN  LDAA    #"?"            ; Load question mark
+    1142/    E969 : 8D FE                       BSR     OUTPUTA         ; Send to console
+    1143/    E96B : FE DF 70            RECOVER LDX     TEMPX1          ; Restore "X"
+    1144/    E96E : 32                          PULA                    ; Restore A
+    1145/    E96F : 7E E1 1F                    JMP     CONTRL          ; Jump to exit
+    1146/    E972 :                     ; 
+    1147/    E972 : 37                  GETCHAR PSHB
+    1148/    E973 : F6 E0 00            WAITIN  LDAB ACIACS             ; LOAD ACIA CONTROL REGISTER
+    1149/    E976 : 57                          ASRB                    ; SHIFT RIGHT  ACIADA
+    1150/    E977 : 24 FA                       BCC     WAITIN          ; IF CARRY NOT SET THEN AGAIN
+    1151/    E979 : B6 E0 01                    LDAA    ACIADA          ; LOAD DATA REGISTER
+    1152/    E97C : 33                          PULB                    ; RESTORE B REGISTER
+    1153/    E97D : 8D FE                       BSR     OUTPUTA         ; ECHO INPUT
+    1154/    E97F : 39                          RTS
+    1155/    E980 :                     ;
+    1156/    E980 : BD E9 80            GETADD  JSR     GETHEX          ; Read in byte
+    1157/    E983 : B7 DF 72                    STAA    ADDRESS         ; store in first part of address
+    1158/    E986 : 8D FE                       BSR     GETHEX          ; Get another byte of data
+    1159/    E988 : B7 DF 73                    STAA    ADDRESS1        ; store in second address register
+    1160/    E98B : FE DF 72                    LDX     ADDRESS         ; Load X register both bytes of address
+    1161/    E98E : 39                          RTS                     ; Return from sub routine
+    1162/    E98F :                     ;
+    1163/    E98F :                     ;       ADD IN THE ADDRESS OFFSET
+    1164/    E98F :                     ;
+    1165/    E98F : 8D FE               GETHEX  BSR     CONVHEX         ; Go get byte of data and convert to binary 
+    1166/    E991 : 48                          ASLA                    ; Shift the the 4 bits into msb
+    1167/    E992 : 48                          ASLA                    ; Shift the the 4 bits into msb 
+    1168/    E993 : 48                          ASLA                    ; Shift the the 4 bits into msb 
+    1169/    E994 : 48                          ASLA                    ; Shift the the 4 bits into msb 
+    1170/    E995 : 16                          TAB                     ; Transfer "A" to "B"
+    1171/    E996 : 8D FE                       BSR     CONVHEX         ; Go get byte of data and convert to binary
+    1172/    E998 : 1B                          ABA                     ; Add 4 bits in "A" and "B" into "B"
+    1173/    E999 : 16                          TAB                     ; Transfer "A" to "B"
+    1174/    E99A : FB DF 75                    ADDB    TEMPA           ; Add into checksum
+    1175/    E99D : F7 DF 75                    STAB    TEMPA           ; Add into checksum
+    1176/    E9A0 : 39                          RTS                     ; Return from sub routine
+    1177/    E9A1 :                     ;       
+    1178/    E9A1 : 8D CF               CONVHEX BSR     GETCHAR         ; Get HEX character from ACIA
+    1179/    E9A3 : 80 30                       SUBA    #$30            ; Convert to binary
+    1180/    E9A5 : 2B C0                       BMI     QUESTN          ; Convert to binary
+    1181/    E9A7 : 81 09                       CMPA    #$09            ; Convert to binary
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 27 - 3/9/2024 102250
+
+
+    1182/    E9A9 : 2F FE                       BLE     RETURN2         ; Convert to binary
+    1183/    E9AB : 81 11                       CMPA    #$11            ; Convert to binary
+    1184/    E9AD : 2B FE                       BMI     INCSTACK        ; Convert to binary
+    1185/    E9AF : 81 16                       CMPA    #$16            ; Convert to binary
+    1186/    E9B1 : 2E FE                       BGT     INCSTACK        ; Convert to binary
+    1187/    E9B3 : 80 07                       SUBA    #$07            ; Convert to binary
+    1188/    E9B5 : 39                  RETURN2 RTS                     ; Return from sub routine
+    1189/    E9B6 :                     ;  
+    1190/    E9B6 : 31                  INCSTACK INS                    ; Restore stack position
+    1191/    E9B7 : 31                          INS                     ; Restore stack position
+    1192/    E9B8 : 20 AD                       BRA     QUESTN         ; Go send ? and exit
+    1193/    E9BA :                     ;
+    1194/    E9BA : 37                  OUTPUTA PSHB                    ; SAVE B
+    1195/    E9BB : F6 E0 00            WAITOUT LDAB ACIACS             ; LOAD ACIA CONTROL REGISTER
+    1196/    E9BE : 57                          ASRB                    ; SHIFT RIGHT
+    1197/    E9BF : 57                          ASRB                    ; SHIFT RIGHT
+    1198/    E9C0 : 24 F9                       BCC     WAITOUT ; IF CARRY NOT SET DO AGAIN
+    1199/    E9C2 : B7 E0 01                    STAA ACIADA             ; SEND CHARACTOR TO ACIA
+    1200/    E9C5 : 33                          PULB                    ; RESTORE B
+    1201/    E9C6 : 39                          RTS                     ; RETURN FROM ROUTINE
+    1202/    E9C7 :                     ;
+    1203/    E9C7 : A6 00               OUTSTR  LDAA    0,X                     ; Read String
+    1204/    E9C9 : 81 04                       CMPA    #$4             ; Is it EOT?
+    1205/    E9CB : 27 FE                       BEQ     STEXIT          ; Exit if EOT
+    1206/    E9CD : 8D EB                       BSR     OUTPUTA ; Print Character
+    1207/    E9CF : 08                          INX                     ; Point at next character
+    1208/    E9D0 : 20 F5                       BRA     OUTSTR          ; Loop and read next
+    1209/    E9D2 : 39                  STEXIT  RTS                     ;
+    1210/    E9D3 :                     ;;;
+    1211/    E9D3 : =$E9D3              RFINI   EQU *
+    1212/    E9D3 :                     ;;; 
+    1213/    E9D3 :                             ;; Fill up to FFD0 with FF
+    1214/    E9D3 : FF FF FF FF FF FF           dc.b [(*+($FFF8-*))&$FFF8-*]$ff
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 28 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 29 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 30 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 31 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 32 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 33 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 34 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 35 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 36 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 37 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 38 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 39 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 40 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 41 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 42 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 43 - 3/9/2024 102250
+
+
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF FF 
+                    FF FF FF FF FF 
+    1215/    FFF8 :                     ;
+    1216/    FFF8 : =$8DB               ROMSIZE EQU RFINI - RSTART + 8  ; 8 bytes for the vectors
+    1217/    FFF8 :                     ;
+    1218/    FFF8 :                     ;END of V2 S-loader 
+    1219/    FFF8 :                     ; 
+    1220/    FFF8 :                     ;   STARTUP VECTORS $FFF8 -$FFFF
+    1221/    FFF8 :                     ;
+    1222/    FFF8 :                             ORG $FFF8
+    1223/    FFF8 :                     ;
+    1224/    FFF8 : E1 57                       FDB IO
+    1225/    FFFA : E1 61                       FDB SWI
+    1226/    FFFC : E1 5C                       FDB POWDWN
+    1227/    FFFE : E1 00                       FDB START
+    1228/   10000 :                     ;
+    1229/   10000 :                     ; Version 1 has table of RAM locations at $A000H
+    1230/   10000 :                             END
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 44 - 3/9/2024 102250
+
+
+  symbol table (* = unused):
+  ------------------------
+
+ ACIACS :                      E000 - |  ACIADA :                      E001 - |
+ ACIAT :                       DF0C C | *ADASC :                       E887 C |
+*ADDR :                        E363 C |  ADDRESS :                     DF72 C |
+ ADDRESS1 :                    DF73 C |
+*ARCHITECTURE :                                        x86_64-unknown-linux - |
+*AREG :                        E871 C |  ASC01 :                       E326 C |
+ ASC02 :                       E327 C |  ASCII :                       E323 C |
+ BAD2 :                        E348 C |  BADDR :                       E16C C |
+ BEGA :                        DF04 C |  BFLAG :                       DF4F C |
+*BIGENDIAN :                      0 - |  BITE2 :                       DF52 C |
+ BITE3 :                       DF53 C |  BKFLG :                       DF16 C |
+ BKFLG2 :                      DF6E C |  BKPNT :                       E206 C |
+ BKPNT2 :                      E1F5 C | *BLANK :                       E85E C |
+ BMC1 :                        E37C C |  BPOINT :                      DF6B C |
+*BRANCHEXT :                      0 - | *BREG :                        E86D C |
+*BUFFER :                      DF00 C | *BYT1 :                        E4C7 C |
+*BYT2 :                        E4A5 C | *BYT21 :                       E4A8 C |
+*BYT22 :                       E4C4 C | *BYT3 :                        E48A C |
+*BYT31 :                       E497 C |  BYTE :                        E17A C |
+ BYTECT :                      DF68 C |  BYTESTORE :                   DF74 C |
+ C1 :                          E16A C | *C2 :                          E2CF C |
+*CASESENSITIVE :                  0 - |  CHA51 :                       E1A5 C |
+ CHANGE :                      E1A3 C | *CHM1 :                        E1C2 C |
+*CKCBA :                       E543 C | *CKROM :                       E5FE C |
+ CLEAR :                       E3FE C | *COMMX :                       E85B C |
+*CONSTPI :        3.141592653589793 - |  CONTG :                       E21A C |
+ CONTRL :                      E11F C | *CONVHEX :                     E9A1 C |
+*CR8 :                         E2EF C |  CR9 :                         E393 C |
+ CRLF :                        E3C6 C | *CRLFAS :                      E884 C |
+*CSET :                        E87E C | *DATE :                    3/9/2024 - |
+ DISIN :                       E3F1 C | *DISPLY :                      E250 C |
+*DISS :                        E3EE C |  DISSA :                       E3CC C |
+*DOT :                         E577 C | *DOT1 :                        E57F C |
+*DPOS :                        E4D9 C |  DSOOP :                       E262 C |
+*DSOOP1 :                      E269 C |  ECHO :                        DF0D C |
+ ECHOFF :                      E2D6 C |  ECHON :                       E2D4 C |
+ ENDA :                        DF06 C |  ENDADD :                      E34D C |
+*EXEC :                        E5EA C | *EXR :                         E5DF C |
+*FALSE :                          0 - |  FIND :                        E396 C |
+*FROMAD :                      E891 C | *FULLPMMU :                       1 - |
+*FUTABL :                      E8BB C | *GETADD :                      E980 C |
+ GETCHAR :                     E972 C |  GETCNT :                      E94B C |
+*GETHEX :                      E98F C |  GOAGAIN :                     E92F C |
+*GOODCH :                      E14E C | *HAS64 :                          1 - |
+*HASDSP :                         0 - | *HASFPU :                         0 - |
+*HASPMMU :                        0 - |  IFILL :                       E336 C |
+*IFILL1 :                      E346 C |  IFILL2 :                      E33E C |
+ IMLR1 :                       E61E C | *IMLR10 :                      E68E C |
+*IMLR11 :                      E699 C | *IMLR12 :                      E6A7 C |
+*IMLR13 :                      E6AF C |  IMLR2 :                       E634 C |
+ IMLR3 :                       E639 C |  IMLR4 :                       E63E C |
+*IMLR5 :                       E641 C | *IMLR6 :                       E644 C |
+ IMLR7 :                       E64C C | *IMLR8 :                       E64F C |
+*IMLR9 :                       E66C C | *IMM :                         E44C C |
+ IN1 :                         E2F7 C | *IN1HG :                       E1E3 C |
+ INCH :                        E196 C | *INCOUNT :                     E962 C |
+*INCSTACK :                    E9B6 C |  INEEE :                       E2F5 C |
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 45 - 3/9/2024 102250
+
+
+*INEXTMODE :                      0 - | *INHEX :                       E1CF C |
+*INLWORDMODE :                    0 - | *INMAXMODE :                      0 - |
+*INSRCMODE :                      0 - | *INSUPMODE :                      0 - |
+ IO :                          E157 C |  IOV :                         DF02 C |
+ ISJ :                         E5B2 C | *ISX :                         E454 C |
+*ISXD :                        E5BA C |  JUMP :                        E319 C |
+ KONTIN :                      E3E3 C |  LIMITS :                      E356 C |
+*LISTON :                         1 - |  LOAD19 :                      E166 C |
+*MACEXP :                         7 - |  MCONT :                       DF6F C |
+ MFINI :                       DF78 - |  MFLAG :                       DF50 C |
+*MOMCPU :                      6800 - | *MOMCPUNAME :                  6800 - |
+ MOVE :                        E371 C |  MSTART :                      DF00 - |
+*NESTMAX :                      100 - | *NEXT :                        E436 C |
+ NIO :                         DF08 C |  NONO :                        E5FB C |
+ NOT1 :                        E538 C | *NOTB :                        E480 C |
+*NOTBB :                       E4EB C | *NOTJ :                        E5CE C |
+ NOTJ1 :                       E5D5 C | *NOTRTI :                      E5E2 C |
+*NOTRTS :                      E5D9 C |  NXTCHR :                      E13F C |
+*OKOP :                        E42A C |  OPSAVE :                      DF64 C |
+ OUT2H :                       E1E4 C |  OUT2HS :                      E1EF C |
+ OUT4HS :                      E1ED C |  OUTA :                        E6DE C |
+ OUTCH :                       E193 C |  OUTEEE :                      E30C C |
+ OUTEEE1 :                     E30D C |  OUTHL :                       E185 C |
+ OUTHR :                       E189 C |  OUTPUTA :                     E9BA C |
+ OUTS :                        E1F1 C |  OUTSTR :                      E9C7 C |
+ OUTXHI :                      E21E C | *PACKING :                        0 - |
+*PADDING :                        0 - | *PAVOI2 :                      E509 C |
+*PAVOI3 :                      E50D C |  PAVOI4 :                      E525 C |
+*PAVOI5 :                      E52F C | *PAVOI8 :                      E51D C |
+*PAVOI9 :                      E531 C |  PB1 :                         DF65 C |
+ PB2 :                         DF66 C |  PB3 :                         DF67 C |
+ PC1 :                         DF69 C |  PC2 :                         DF6A C |
+*PCTR :                        E87A C | *PDAT :                        E2D1 C |
+ PDATA1 :                      E19C C |  PDATA2 :                      E199 C |
+ PIAD1A :                      E004 - | *PIAD1B :                      E006 - |
+ PIAD2A :                      E008 - | *PIAD2B :                      E00A - |
+*PIAS1A :                      E005 - | *PIAS1B :                      E007 - |
+*PIAS2A :                      E009 - | *PIAS2B :                      E00B - |
+*PNT3C :                       E6B2 C | *PNTA :                        E862 C |
+*PNTB :                        E865 C |  PNTBYT :                      E3BD C |
+*PNTS :                        E2AC C |  POWDWN :                      E15C C |
+ PRINT :                       E253 C | *PRINTR :                      DF4C C |
+*PRINTS :                      E2DB C |  PRNTON :                      E2D5 C |
+*PROMPT :                      E868 C | *PRTS :                        E2EC C |
+*PUT :                         E460 C | *PUT1 :                        E463 C |
+ QUESTN :                      E967 C | *RAMSIZE :                       78 - |
+*RDC :                         E567 C | *RDX :                         E561 C |
+*RECOVER :                     E96B C | *RELAXED :                        0 - |
+*RETNOT :                      E574 C | *RETURN :                      E3E6 C |
+*RETURN2 :                     E9B5 C |  RFINI :                       E9D3 - |
+*ROMSIZE :                      8DB - |  RSTART :                      E100 - |
+*S1EXIT :                      E95B C |  S1STRING :                    E8FA C |
+ SAV :                         E2F1 C | *SFE :                         E227 C |
+ SKIP :                        E3B4 C | *SLOAD :                       E92B - |
+ SMC1 :                        E39F C | *SMC2 :                        E3AD C |
+ SP :                          DF0A C | *SPLBD0 :                      E858 C |
+*SREG :                        E877 C |  STACK :                       DF44 C |
+ START :                       E100 - | *STEXIT :                      E9D2 C |
+ SWI :                         E161 C |  SWIPTR :                      DF17 C |
+*TBL :                         E732 C | *TBLEND :                      E8FA - |
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 46 - 3/9/2024 102250
+
+
+*TBLKUP :                      E61A C |  TEMP :                        DF10 C |
+ TEMPA :                       DF75 C |  TEMPX1 :                      DF70 C |
+ TFLAG :                       DF13 C | *THRUAD :                      E89E C |
+*TIME :                      102250 - | *TOADD :                       E8AB C |
+ TRACE :                       E3D1 C | *TRUE :                           1 - |
+ TSTACK :                      DF62 C | *TSTB :                        E591 C |
+*TSTJ :                        E5A2 C | *TW :                          DF11 C |
+ UPRAM :                       DF00 - |  USER :                        E152 C |
+ USERV :                       DF76 C | *VALASC :                      E8B4 C |
+ VALUE :                       E368 C |  VCOM1 :                       E6E4 C |
+*VCOM10 :                      E6FE C |  VCOM2 :                       E70A C |
+*VCOM3 :                       E714 C | *VCOM4 :                       E716 C |
+ VCOM5 :                       E6E9 C |  VCOM9 :                       E6F1 C |
+*VERSION :                     142F - |  VIEW :                        E6E1 C |
+ WAITIN :                      E973 C |  WAITOUT :                     E9BB C |
+ XBK :                         E1CD C |  XFLAG :                       DF51 C |
+ XHI :                         DF0E C |  XLOW :                        DF0F C |
+*XREG :                        E874 C |  XTEMP :                       DF14 C |
+*_E000 :                          1 - |
+
+    269 symbols
+    137 unused symbols
+
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 47 - 3/9/2024 102250
+
+
+  defined macros:
+  ---------------
+
+ABX                                   | DB                                   
+DD                                    | DS                                   
+DW                                    | FCD                                  
+FCW                                   | LDAD                                 
+LDD                                   | LIST                                 
+NOLIST                                | NOOPT                                
+OPT                                   | PAGE                                 
+PSHD                                  | PSHX                                 
+PULD                                  | PULX                                 
+STD                                   | SUBD                                 
+XFCB                                  | XFCC                                 
+XFDB                                  | XRMB                                 
+ZRMB                                  |
+
+     25 macros
+
+ AS V1.42 Beta [Bld 119] - source file smithbug.asm - page 48 - 3/9/2024 102250
+
+
+  codepages:
+  ----------
+
+STANDARD (0 changed characters)
+
+
+0.01 seconds assembly time
+
+   1536 lines source file
+   1546 lines incl. macro expansions
+      1 pass
+        additional necessary passes not started due to
+        errors, listing possibly incorrect
+      1 error
+      0 warnings
